@@ -17,6 +17,30 @@ Timing values measure JavaScript work and requestAnimationFrame cadence, not com
 
 Build and launch commands are listed below. Layer folders, magic wand, and SAI2 import/export are not part of this initial change.
 
+
+## Personal fork backlog (2026-10-15)
+
+### Possible upstream bug: inconsistent dimension limits
+
+- Upstream main at 7b1d474 computes the general canvas limit as min(4096, max(2048, screen.width, screen.height)) in kl-app.ts, while PSD metadata validation independently hard-codes 4096 in kl-app-import-handler.ts.
+- The separate limits are verified; whether this distinction is intentional is unknown. Do not describe upstream as having a universally fixed 2048px limit.
+- In this fork, the leftover PSD constant rejected a 2976 × 4175 document after the general limit had been raised to 8192. Fixed by using klMaxCanvasSize (4e92354).
+- Keep as a possible bug / limit-consistency improvement for a later upstream proposal together with related findings. No upstream issue or PR has been filed for this item. Investigate rationale before proposing unification; unification can change allowed import sizes.
+
+### Required editable document features
+
+User confirmed all three as essential after importing an existing PSD:
+
+1. Layer groups: preserve nested hierarchy rather than ungrouping or compositing imported groups; support group editing, visibility, opacity and group compositing semantics.
+2. All blend modes supported by SAI2: inventory the actual SAI2 modes and rendering behavior before implementation; map PSD equivalents where possible and explicitly handle modes without an equivalent. Matching names alone does not establish matching output. The specific unsupported mode in the reported PSD is not yet identified.
+3. Non-destructive layer masks: retain masks as separately editable data rather than baking them into pixels. Account for group masks as part of the group/mask design.
+
+Current PSD conversion (src/app/script/klecks/storage/psd.ts) loses group structure, applies masks to pixels, and warns about unsupported blend modes. The reported warning is evidence of conversion limitations, not proof that the image is preserved exactly.
+
+Design the layer tree, masks and compositing together before implementing individual UI controls. Include undo/redo, browser persistence/recovery, and PSD import/export in the scope so structures survive saving and reopening. SAI2 import/export remains a subsequent compatibility goal. Existing required magic-wand selection work remains on the backlog.
+
+Drawing, visual fidelity and interaction verification remain human tasks; do not run automated browser/drawing tests without a new request. Implementation order is not yet finalized.
+
 ---
 
 <div align="center">
