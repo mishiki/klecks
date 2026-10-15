@@ -5,7 +5,6 @@ import { floodFillBits } from '../image-operations/flood-fill';
 import { drawShape } from '../image-operations/shape-tool';
 import { renderText, TRenderTextParam } from '../image-operations/render-text';
 import {
-    isLayerFill,
     TFillSampling,
     TGradient,
     TInterpolationAlgorithm,
@@ -27,7 +26,7 @@ import { getMultiPolyBounds } from '../../bb/multi-polygon/get-multi-polygon-bou
 import { coordinateBoundsToIndexBounds, rectToBounds } from '../../bb/math/math';
 import { matrixToTuple } from '../../bb/math/matrix-to-tuple';
 import { getEraseColor } from '../brushes/erase-color';
-import { HISTORY_TILE_SIZE, KlHistory } from '../history/kl-history';
+import { KlHistory } from '../history/kl-history';
 import { getNextLayerId } from '../history/get-next-layer-id';
 import {
     THistoryEntryDataComposed,
@@ -41,13 +40,13 @@ import { isHistoryEntryVisibilityChange } from '../history/push-helpers/is-histo
 import { transformCoordinateBounds } from '../../bb/transform/transform-coordinate-bounds';
 import { createLayerMap } from '../history/push-helpers/create-layer-map';
 import { Eyedropper } from './eyedropper';
-import { copyImageDataTile } from '../history/image-data-tile';
 import { randomUuid } from '../../bb/base/base';
 import { translateMultiPolygon } from '../../bb/multi-polygon/translate-multi-polygon';
 import { getBinaryMask } from '../select-tool/get-binary-mask';
 import { TIndexBounds } from '../../bb/bb-types';
 import { LayerCompositor } from './layer-compositor';
 import { getMixModeStr } from './get-mix-mode';
+import { getSubtreeRange, isGroupLayer } from './layer-tree';
 
 export const MAX_LAYERS = 255;
 
@@ -59,6 +58,10 @@ export type TKlCanvasLayer = {
     hasClipping: boolean;
     isVisible: boolean;
     opacity: number;
+    groupId?: string | null;
+    parentGroupId?: string | null;
+    isExpanded?: boolean;
+    isPassThrough?: boolean;
     compositeObj?: TLayerComposite;
     canvas: HTMLCanvasElement;
     context: CanvasRenderingContext2D;
@@ -90,6 +93,36 @@ export class KlCanvas {
         });
     }
 
+    private getTopPaintIndex(): number {
+        for (let i = this.layers.length - 1; i >= 0; i--) {
+            if (!isGroupLayer(this.layers[i])) {
+                return i;
+            }
+        }
+        return -1;
+    }
+
+    private appendBlankPaintLayer(): TKlCanvasLayer {
+        const canvas = BB.canvas(this.width, this.height);
+        const layer: TKlCanvasLayer = {
+            id: getNextLayerId(),
+            index: this.layers.length,
+            name: LANG('layers-layer') + ' 1',
+            mixModeStr: 'source-over',
+            hasClipping: false,
+            isVisible: true,
+            opacity: 1,
+            groupId: null,
+            parentGroupId: null,
+            isExpanded: true,
+            isPassThrough: false,
+            canvas,
+            context: BB.ctx(canvas),
+        };
+        this.layers.push(layer);
+        return layer;
+    }
+
     // ----------------------------------- public -----------------------------------
 
     constructor(
@@ -112,6 +145,17 @@ export class KlCanvas {
             },
             this.klHistory.getComposed(),
         );
+        if (this.getTopPaintIndex() < 0) {
+            const paintLayer = this.appendBlankPaintLayer();
+            this.klHistory.push({
+                activeLayerId: paintLayer.id,
+                layerMap: createLayerMap(
+                    this.layers,
+                    { attributes: ['index'] },
+                    { layerId: paintLayer.id, attributes: 'all' },
+                ),
+            });
+        }
     }
 
     /*
@@ -149,7 +193,7 @@ export class KlCanvas {
 
         this.klHistory.pause(true);
         try {
-            if (p.layers) {
+            if (p.layers && p.layers.length > 0) {
                 for (let i = 0; i < p.layers.length; i++) {
                     const pItem = p.layers[i];
                     if (!this.layers[i]) {
@@ -161,17 +205,30 @@ export class KlCanvas {
                     layer.isVisible = pItem.isVisible;
                     layer.mixModeStr = pItem.mixModeStr;
                     layer.hasClipping = pItem.hasClipping;
-                    changeCanvasDimensions(layer.canvas, this.width, this.height, {
+                    layer.groupId = pItem.groupId ?? null;
+                    layer.parentGroupId = pItem.parentGroupId ?? null;
+                    layer.isExpanded = pItem.isExpanded ?? true;
+                    layer.isPassThrough = pItem.isPassThrough ?? false;
+                    changeCanvasDimensions(layer.canvas, isGroupLayer(layer) ? 1 : this.width, isGroupLayer(layer) ? 1 : this.height, {
                         ensureCleared: true,
                     });
-                    layer.context.drawImage(pItem.image, 0, 0);
+                    if (!isGroupLayer(layer)) {
+                        layer.context.drawImage(pItem.image, 0, 0);
+                    }
                     this.setOpacity(i, pItem.opacity);
+                }
+                if (this.getTopPaintIndex() < 0) {
+                    this.appendBlankPaintLayer();
                 }
             } else {
                 const layer = this.layers[0];
                 layer.name = p.layerName ? p.layerName : LANG('layers-layer') + ' 1';
                 layer.isVisible = true;
                 layer.hasClipping = false;
+                layer.groupId = null;
+                layer.parentGroupId = null;
+                layer.isExpanded = true;
+                layer.isPassThrough = false;
                 changeCanvasDimensions(layer.canvas, this.width, this.height, {
                     ensureCleared: true,
                 });
@@ -199,7 +256,7 @@ export class KlCanvas {
                 },
                 selection: { value: this.selection },
                 background: this.background,
-                activeLayerId: this.layers.at(-1)!.id,
+                activeLayerId: this.layers[this.getTopPaintIndex()].id,
                 layerMap: createLayerMap(this.layers, {
                     attributes: 'all',
                 }) as Record<TLayerId, THistoryEntryLayerComposed>,
@@ -207,7 +264,7 @@ export class KlCanvas {
             this.klHistory.push(historyEntryData);
         }
 
-        return this.layers.length - 1;
+        return this.getTopPaintIndex();
     }
 
     isLayerLimitReached(): boolean {
@@ -268,6 +325,9 @@ export class KlCanvas {
             const tmp1Ctx = BB.ctx(tmp1);
             tmp1Ctx.imageSmoothingEnabled = false;
             for (let i = 0; i < this.layers.length; i++) {
+                if (isGroupLayer(this.layers[i])) {
+                    continue;
+                }
                 if (i > 0) {
                     tmp1Ctx.clearRect(0, 0, w, h);
                 }
@@ -281,6 +341,9 @@ export class KlCanvas {
             tmp1 = BB.canvas();
             tmp2 = BB.canvas();
             for (let i = 0; i < this.layers.length; i++) {
+                if (isGroupLayer(this.layers[i])) {
+                    continue;
+                }
                 BB.resizeCanvas(this.layers[i].canvas, w, h, tmp1, tmp2);
             }
         }
@@ -325,7 +388,11 @@ export class KlCanvas {
             return false;
         }
 
+        const bottomPaintIndex = this.layers.findIndex((layer) => !isGroupLayer(layer));
         for (let i = 0; i < this.layers.length; i++) {
+            if (isGroupLayer(this.layers[i])) {
+                continue;
+            }
             const ctemp = BB.canvas(this.width, this.height);
             const layer = this.layers[i];
             BB.ctx(ctemp).drawImage(layer.canvas, 0, 0);
@@ -333,7 +400,7 @@ export class KlCanvas {
             changeCanvasDimensions(layer.canvas, newW, newH, { ensureCleared: true });
 
             layer.context.save();
-            if (i === 0 && p.fillColor) {
+            if (i === bottomPaintIndex && p.fillColor) {
                 layer.context.fillStyle = BB.ColorConverter.toRgbStr(p.fillColor);
                 layer.context.fillRect(0, 0, newW, newH);
                 layer.context.clearRect(offX, offY, this.width, this.height);
@@ -375,7 +442,20 @@ export class KlCanvas {
         if (this.isLayerLimitReached()) {
             return false;
         }
-        const index = selectedIndex === undefined ? this.layers.length : selectedIndex + 1;
+        const selected = selectedIndex === undefined ? undefined : this.layers[selectedIndex];
+        if (selectedIndex !== undefined && !selected) {
+            return false;
+        }
+        const index = selected === undefined
+            ? this.layers.length
+            : isGroupLayer(selected)
+                ? selectedIndex!
+                : selectedIndex! + 1;
+        const parentGroupId = selected === undefined
+            ? null
+            : isGroupLayer(selected)
+                ? selected.groupId
+                : (selected.parentGroupId ?? null);
 
         const canvas = BB.canvas(this.width, this.height);
         const context = BB.ctx(canvas);
@@ -399,6 +479,10 @@ export class KlCanvas {
             hasClipping: data?.hasClipping ?? false,
             isVisible: data ? data.isVisible : true,
             opacity: data ? data.opacity : 1,
+            groupId: null,
+            parentGroupId,
+            isExpanded: true,
+            isPassThrough: false,
             canvas,
             context,
         };
@@ -433,78 +517,104 @@ export class KlCanvas {
         return index;
     }
 
-    duplicateLayer(srcIndex: number): false | number {
-        if (!this.layers[srcIndex] || this.isLayerLimitReached()) {
+    /** Insert an empty group as a sibling above the selected layer or group. */
+    addGroup(selectedIndex?: number): false | number {
+        if (this.isLayerLimitReached()) {
             return false;
         }
-        const srcLayer = this.layers[srcIndex];
-        const newIndex = srcIndex + 1;
-
-        const composed = this.klHistory.getComposed();
-        const srcComposed = composed.layerMap[srcLayer.id];
-
-        const canvas = BB.canvas(this.width, this.height);
-        const ctx = BB.ctx(canvas);
-        const layerId = getNextLayerId();
-        const newLayer: TKlCanvasLayer = {
-            id: layerId,
-            index: newIndex,
-            name: srcLayer.name + ' ' + LANG('layers-copy'),
-            mixModeStr: srcLayer.mixModeStr,
-            hasClipping: srcLayer.hasClipping,
-            isVisible: srcLayer.isVisible,
-            opacity: srcLayer.opacity,
+        const selected = selectedIndex === undefined ? undefined : this.layers[selectedIndex];
+        if (selectedIndex !== undefined && !selected) {
+            return false;
+        }
+        const index = selected === undefined ? this.layers.length : selectedIndex! + 1;
+        const canvas = BB.canvas(1, 1);
+        const group: TKlCanvasLayer = {
+            id: getNextLayerId(),
+            index,
+            name: LANG('layers-group') + ' ' + (this.layers.filter(isGroupLayer).length + 1),
+            mixModeStr: 'source-over',
+            hasClipping: false,
+            isVisible: true,
+            opacity: 1,
+            groupId: randomUuid(),
+            parentGroupId: selected?.parentGroupId ?? null,
+            isExpanded: true,
+            isPassThrough: true,
             canvas,
-            context: ctx,
+            context: BB.ctx(canvas),
         };
-
-        this.layers.splice(newIndex, 0, newLayer);
-
-        {
-            // draw into new layer from old
-            const tilesPerX = Math.ceil(this.width / HISTORY_TILE_SIZE);
-            // Uncaught TypeError: Cannot read properties of undefined (reading 'tiles')
-            srcComposed.tiles.forEach((tile, index) => {
-                const x = index % tilesPerX;
-                const y = Math.floor(index / tilesPerX);
-                ctx.save();
-                if (isLayerFill(tile)) {
-                    ctx.fillStyle = tile.fill;
-                    ctx.fillRect(
-                        x * HISTORY_TILE_SIZE,
-                        y * HISTORY_TILE_SIZE,
-                        HISTORY_TILE_SIZE,
-                        HISTORY_TILE_SIZE,
-                    );
-                } else {
-                    ctx.putImageData(tile.data, x * HISTORY_TILE_SIZE, y * HISTORY_TILE_SIZE);
-                }
-                ctx.restore();
+        this.layers.splice(index, 0, group);
+        this.updateIndices();
+        if (!this.klHistory.isPaused()) {
+            this.klHistory.push({
+                activeLayerId: group.id,
+                layerMap: createLayerMap(
+                    this.layers,
+                    { attributes: ['index'] },
+                    { layerId: group.id, attributes: 'all' },
+                ),
             });
         }
+        return index;
+    }
+
+    duplicateLayer(srcIndex: number): false | number {
+        if (!this.layers[srcIndex]) {
+            return false;
+        }
+        const range = getSubtreeRange(this.layers, srcIndex);
+        const sourceLayers = this.layers.slice(range.start, range.end + 1);
+        if (this.layers.length + sourceLayers.length > MAX_LAYERS) {
+            return false;
+        }
+        const newIndex = srcIndex + 1;
+        const newGroupIds = new Map<string, string>();
+        sourceLayers.forEach((layer) => {
+            if (isGroupLayer(layer)) {
+                newGroupIds.set(layer.groupId, randomUuid());
+            }
+        });
+        const copies = sourceLayers.map((source, offset): TKlCanvasLayer => {
+            const canvas = BB.canvas(
+                isGroupLayer(source) ? 1 : this.width,
+                isGroupLayer(source) ? 1 : this.height,
+            );
+            const context = BB.ctx(canvas);
+            if (!isGroupLayer(source)) {
+                context.drawImage(source.canvas, 0, 0);
+            }
+            return {
+                ...source,
+                id: getNextLayerId(),
+                index: newIndex + offset,
+                name: offset === sourceLayers.length - 1
+                    ? source.name + ' ' + LANG('layers-copy')
+                    : source.name,
+                groupId: isGroupLayer(source) ? newGroupIds.get(source.groupId)! : null,
+                parentGroupId: source.parentGroupId
+                    ? (newGroupIds.get(source.parentGroupId) ?? source.parentGroupId)
+                    : null,
+                canvas,
+                context,
+                compositeObj: undefined,
+            };
+        });
+
+        this.layers.splice(newIndex, 0, ...copies);
 
         this.updateIndices();
 
         if (!this.klHistory.isPaused()) {
             this.klHistory.push({
-                activeLayerId: layerId,
+                activeLayerId: copies.at(-1)!.id,
                 layerMap: createLayerMap(
                     this.layers,
                     { attributes: ['index'] },
-                    {
-                        layerId,
-                        attributes: 'all',
-                        tiles: srcComposed.tiles.map((tile) => {
-                            if (isLayerFill(tile)) {
-                                return { ...tile };
-                            }
-                            return copyImageDataTile(tile);
-                        }),
-                    },
+                    ...copies.map((layer) => ({ layerId: layer.id, attributes: 'all' as const })),
                 ),
             });
         }
-        return srcIndex + 1;
+        return newIndex + copies.length - 1;
     }
 
     getLayerContext(index: number, doReturnNull?: boolean): CanvasRenderingContext2D | null {
@@ -524,10 +634,25 @@ export class KlCanvas {
         if (!toDeleteLayer) {
             return false;
         }
-        BB.freeCanvas(toDeleteLayer.canvas);
-        this.layers.splice(index, 1);
+        const range = getSubtreeRange(this.layers, index);
+        const paintOutside = this.layers.some((layer, layerIndex) =>
+            (layerIndex < range.start || layerIndex > range.end) && !isGroupLayer(layer),
+        );
+        if (!paintOutside) {
+            return false;
+        }
+        const removed = this.layers.splice(range.start, range.end - range.start + 1);
+        removed.forEach((layer) => BB.freeCanvas(layer.canvas));
         this.updateIndices();
-        const activeLayerIndex = Math.max(0, index - 1);
+        const activeLayerIndex = this.layers.reduce((bestIndex, layer, layerIndex) => {
+            if (isGroupLayer(layer)) {
+                return bestIndex;
+            }
+            return bestIndex < 0 ||
+                Math.abs(layerIndex - range.start) < Math.abs(bestIndex - range.start)
+                ? layerIndex
+                : bestIndex;
+        }, -1);
         const activeLayerId = this.layers[activeLayerIndex].id;
 
         if (!this.klHistory.isPaused()) {
@@ -624,32 +749,131 @@ export class KlCanvas {
     }
 
     moveLayer(index: number, delta: number): void | number {
-        if (delta === 0) {
+        if (!delta || !this.layers[index]) {
             return;
         }
-        if (!this.layers[index]) {
+        const parentId = this.layers[index].parentGroupId ?? null;
+        const siblings = this.layers.flatMap((layer, layerIndex) =>
+            (layer.parentGroupId ?? null) === parentId ? [layerIndex] : [],
+        );
+        const position = siblings.indexOf(index);
+        if (position < 0) {
             return;
         }
-        const temp = this.layers[index];
-        this.layers.splice(index, 1);
-        const targetIndex = Math.max(0, Math.min(index + delta, this.layers.length));
-        this.layers.splice(targetIndex, 0, temp);
-        this.updateIndices();
+        const targetPosition = Math.max(0, Math.min(position + Math.trunc(delta), siblings.length - 1));
+        if (targetPosition === position) {
+            return;
+        }
+        return this.moveLayerTo(
+            index,
+            siblings[targetPosition],
+            targetPosition > position ? 'above' : 'below',
+        );
+    }
 
+    /** Move a layer and all descendants. above/below make it a sibling of target. */
+    moveLayerTo(
+        index: number,
+        targetIndex: number,
+        placement: 'above' | 'below' | 'inside',
+    ): number | undefined {
+        const source = this.layers[index];
+        const target = this.layers[targetIndex];
+        if (!source || !target) {
+            return undefined;
+        }
+        const sourceRange = getSubtreeRange(this.layers, index);
+        if (targetIndex >= sourceRange.start && targetIndex <= sourceRange.end) {
+            return undefined;
+        }
+        if (placement === 'inside' && !isGroupLayer(target)) {
+            return undefined;
+        }
+
+        const targetRange = getSubtreeRange(this.layers, targetIndex);
+        const insertionIndex = placement === 'inside'
+            ? targetIndex
+            : placement === 'below'
+                ? targetRange.start
+                : targetIndex + 1;
+        const parentGroupId = placement === 'inside'
+            ? target.groupId!
+            : (target.parentGroupId ?? null);
+        const length = sourceRange.end - sourceRange.start + 1;
+        const adjustedIndex = insertionIndex > sourceRange.end
+            ? insertionIndex - length
+            : insertionIndex;
+        if (adjustedIndex === sourceRange.start && (source.parentGroupId ?? null) === parentGroupId) {
+            return index;
+        }
+        const subtree = this.layers.splice(sourceRange.start, length);
+        subtree.at(-1)!.parentGroupId = parentGroupId;
+        this.layers.splice(adjustedIndex, 0, ...subtree);
+        this.updateIndices();
+        const newRootIndex = adjustedIndex + length - 1;
         if (!this.klHistory.isPaused()) {
             this.klHistory.push({
-                activeLayerId: this.layers[targetIndex].id,
-                layerMap: createLayerMap(this.layers, { attributes: ['index'] }),
+                activeLayerId: source.id,
+                layerMap: createLayerMap(
+                    this.layers,
+                    { attributes: ['index'] },
+                    { layerId: source.id, attributes: ['index', 'parentGroupId'] },
+                ),
             });
         }
+        return newRootIndex;
+    }
 
-        return targetIndex;
+    setGroupExpanded(index: number, isExpanded: boolean): boolean {
+        const group = this.layers[index];
+        if (!isGroupLayer(group)) {
+            return false;
+        }
+        if ((group.isExpanded ?? true) === isExpanded) {
+            return true;
+        }
+        group.isExpanded = isExpanded;
+        if (!this.klHistory.isPaused()) {
+            this.klHistory.push({
+                layerMap: createLayerMap(this.layers, {
+                    layerId: group.id,
+                    attributes: ['isExpanded'],
+                }),
+            });
+        }
+        return true;
+    }
+
+    setGroupPassThrough(index: number, isPassThrough: boolean): boolean {
+        const group = this.layers[index];
+        if (!isGroupLayer(group)) {
+            return false;
+        }
+        if ((group.isPassThrough ?? false) === isPassThrough) {
+            return true;
+        }
+        group.isPassThrough = isPassThrough;
+        if (!this.klHistory.isPaused()) {
+            this.klHistory.push({
+                layerMap: createLayerMap(this.layers, {
+                    layerId: group.id,
+                    attributes: ['isPassThrough'],
+                }),
+            });
+        }
+        return true;
     }
 
     mergeLayer(layerIndex: number, mixModeStr?: TMixMode): number | undefined {
         const topLayer = this.layers[layerIndex];
         const bottomLayer = this.layers[layerIndex - 1];
-        if (!bottomLayer || !topLayer) {
+        if (
+            !bottomLayer ||
+            !topLayer ||
+            isGroupLayer(bottomLayer) ||
+            isGroupLayer(topLayer) ||
+            (bottomLayer.parentGroupId ?? null) !== (topLayer.parentGroupId ?? null)
+        ) {
             return;
         }
 
@@ -703,6 +927,10 @@ export class KlCanvas {
             isVisible: true,
             mixModeStr: 'source-over',
             hasClipping: false,
+            groupId: null,
+            parentGroupId: null,
+            isExpanded: true,
+            isPassThrough: false,
         };
         freeCanvas(this.layers[0].canvas);
         this.layers[0] = bottomLayer;
@@ -756,6 +984,9 @@ export class KlCanvas {
         }
         const ctx = BB.ctx(temp);
         for (let i = 0; i < this.layers.length; i++) {
+            if (isGroupLayer(this.layers[i])) {
+                continue;
+            }
             ctx.clearRect(0, 0, temp.width, temp.height);
             ctx.save();
             ctx.setTransform(...matrixToTuple(matrix));
@@ -787,6 +1018,9 @@ export class KlCanvas {
         if (!isHorizontal && !isVertical) {
             return;
         }
+        if (layerIndex !== undefined && isGroupLayer(this.layers[layerIndex])) {
+            return;
+        }
 
         const temp = BB.canvas(this.width, this.height);
         changeCanvasDimensions(temp, this.width, this.height);
@@ -799,6 +1033,9 @@ export class KlCanvas {
         );
 
         for (let i = 0; i < this.layers.length; i++) {
+            if (isGroupLayer(this.layers[i])) {
+                continue;
+            }
             if ((layerIndex || layerIndex === 0) && i !== layerIndex) {
                 continue;
             }
@@ -837,6 +1074,9 @@ export class KlCanvas {
     // arbitrary drawing operation & focus layer
     drawOperation(layerIndex: number, operation: (ctx: CanvasRenderingContext2D) => void): void {
         const targetLayer = this.layers[layerIndex];
+        if (!targetLayer || isGroupLayer(targetLayer)) {
+            return;
+        }
         const ctx = targetLayer.context;
         operation(ctx);
 
@@ -857,6 +1097,9 @@ export class KlCanvas {
         compositeOperation?: string,
         doClipSelection?: boolean,
     ): void {
+        if (!this.layers[layerIndex] || isGroupLayer(this.layers[layerIndex])) {
+            return;
+        }
         const ctx = this.layers[layerIndex].context;
         ctx.save();
         const isUniformFill =
@@ -927,6 +1170,9 @@ export class KlCanvas {
         }
 
         const targetLayer = this.layers[layerIndex];
+        if (!targetLayer || isGroupLayer(targetLayer)) {
+            return;
+        }
         let result: ReturnType<typeof floodFillBits>;
         let targetCtx;
         let targetImageData;
@@ -1050,6 +1296,9 @@ export class KlCanvas {
             return;
         }
         const targetLayer = this.layers[layerIndex];
+        if (!targetLayer || isGroupLayer(targetLayer)) {
+            return;
+        }
         const selectionPath = this.selection
             ? new Path2D(getSelectionPath2d(this.selection))
             : undefined;
@@ -1075,6 +1324,9 @@ export class KlCanvas {
 
     drawGradient(layerIndex: number, gradientObj: TGradient): void {
         const targetLayer = this.layers[layerIndex];
+        if (!targetLayer || isGroupLayer(targetLayer)) {
+            return;
+        }
         const selectionPath = this.selection
             ? new Path2D(getSelectionPath2d(this.selection))
             : undefined;
@@ -1091,6 +1343,9 @@ export class KlCanvas {
 
     text(layerIndex: number, p: TRenderTextParam): void {
         const targetLayer = this.layers[layerIndex];
+        if (!targetLayer || isGroupLayer(targetLayer)) {
+            return;
+        }
         const rect = renderText(
             targetLayer.canvas,
             BB.copyObj(p),
@@ -1131,6 +1386,9 @@ export class KlCanvas {
         useSelection?: boolean; // default false
     }): void {
         const targetLayer = this.layers[p.layerIndex];
+        if (!targetLayer || isGroupLayer(targetLayer)) {
+            return;
+        }
         const ctx = targetLayer.context;
         ctx.save();
         let bounds: TIndexBounds | undefined;
@@ -1221,6 +1479,10 @@ export class KlCanvas {
                     opacity: layer.opacity,
                     mixModeStr: layer.mixModeStr,
                     hasClipping: layer.hasClipping,
+                    groupId: layer.groupId ?? null,
+                    parentGroupId: layer.parentGroupId ?? null,
+                    isExpanded: layer.isExpanded ?? true,
+                    isPassThrough: layer.isPassThrough ?? false,
                     image: layer.canvas,
                 };
             }),
@@ -1230,12 +1492,15 @@ export class KlCanvas {
     setMixMode(layerIndex: number, mixModeStr: TMixMode): void {
         const targetLayer = this.layers[layerIndex];
         targetLayer.mixModeStr = mixModeStr;
+        if (isGroupLayer(targetLayer)) {
+            targetLayer.isPassThrough = false;
+        }
 
         if (!this.klHistory.isPaused()) {
             this.klHistory.push({
                 layerMap: createLayerMap(this.layers, {
                     layerId: targetLayer.id,
-                    attributes: ['mixModeStr'],
+                    attributes: ['mixModeStr', 'isPassThrough'],
                 }),
             });
         }

@@ -16,6 +16,7 @@ import { createImage } from '../../../bb/base/ui';
 import { createHelpButton } from '../components/help-button';
 import { showError, showModal } from '../modals/base/show-modal';
 import { asyncThrow } from '../../../bb/base/base';
+import { isGroupLayer } from '../../canvas/layer-tree';
 
 const copyImg = getIconUrl('copy');
 export type TEditUiParams = {
@@ -107,6 +108,10 @@ This has been reported to Google.
 
         const createButton = (filterKey: string): HTMLElement => {
             const filter = filters[filterKey];
+            const isCanvasFilter = ['cropExtend', 'resize', 'rotate'].includes(filterKey);
+            const isLayerFilterBlocked = () =>
+                !isCanvasFilter &&
+                isGroupLayer(this.klCanvas.getLayer(this.getCurrentLayerIndex()));
 
             const button = BB.el({
                 tagName: 'button',
@@ -142,6 +147,9 @@ This has been reported to Google.
 
             if (isEnabled) {
                 button.onclick = () => {
+                    if (isLayerFilterBlocked()) {
+                        return;
+                    }
                     this.applyUncommitted();
                     type TOptions = 'Ok' | 'Cancel';
                     const dialogButtons: TOptions[] = ['Ok', 'Cancel'];
@@ -180,6 +188,9 @@ This has been reported to Google.
                     }
 
                     const applyFilter = (input: any) => {
+                        if (isLayerFilterBlocked()) {
+                            return;
+                        }
                         const filterResult = filters[filterKey].apply!({
                             layer: this.klCanvas.getLayer(this.getCurrentLayerIndex()),
                             klCanvas: this.klCanvas,

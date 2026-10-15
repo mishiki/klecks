@@ -15,6 +15,67 @@
     color: var(--kl-color);
 }
 
+.groupRow :global(.kl-layer__label) {
+    font-weight: 600;
+}
+
+.addGroupIcon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    width: 20px;
+    height: 20px;
+    font-size: 19px;
+    white-space: nowrap;
+}
+
+.addGroupIcon::after {
+    content: '+';
+    position: absolute;
+    right: -3px;
+    bottom: -3px;
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: #fff;
+    color: #222;
+    font-size: 14px;
+    font-weight: bold;
+    line-height: 12px;
+}
+
+.dragging {
+    opacity: 0.7;
+}
+
+.dropAbove::after,
+.dropBelow::after,
+.dropInside::after {
+    content: '';
+    position: absolute;
+    z-index: 3;
+    pointer-events: none;
+    left: 1px;
+    right: 1px;
+}
+
+.dropAbove::after {
+    top: 0;
+    border-top: 3px solid var(--active-highlight-color);
+}
+
+.dropBelow::after {
+    bottom: 0;
+    border-bottom: 3px solid var(--active-highlight-color);
+}
+
+.dropInside::after {
+    top: 1px;
+    bottom: 1px;
+    border: 2px solid var(--active-highlight-color);
+}
+
 .backgroundControl {
     display: flex;
     flex-direction: column;

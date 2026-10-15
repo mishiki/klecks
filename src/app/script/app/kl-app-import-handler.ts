@@ -6,7 +6,7 @@ import { changeCanvasDimensions } from '../bb/base/change-canvas-dimensions';
 import { KlCanvas } from '../klecks/canvas/kl-canvas';
 import { LayersUi } from '../klecks/ui/tool-tabs/layers-ui/layers-ui';
 import { TRect, TSize2D } from '../bb/bb-types';
-import { asyncThrow, attempt, AttemptError, throwIfNull, throwIfUndefined } from '../bb/base/base';
+import { asyncThrow, attempt, AttemptError, randomUuid, throwIfNull, throwIfUndefined } from '../bb/base/base';
 import { loadImage, loadImageFromBlob } from '../bb/base/load-image';
 import { getNextLayerId } from '../klecks/history/get-next-layer-id';
 import { detectFiletype } from '../klecks/storage/file-header-detection';
@@ -126,7 +126,9 @@ export class KlAppImportHandler {
                 if (convertedPsdObj.layers) {
                     for (let i = 0; i < convertedPsdObj.layers.length; i++) {
                         const item = convertedPsdObj.layers[i];
-                        crop(item.image, cropCanvas, cropObj);
+                        if (!item.groupId) {
+                            crop(item.image, cropCanvas, cropObj);
+                        }
                     }
                 }
             }
@@ -148,12 +150,20 @@ export class KlAppImportHandler {
             if (convertedPsdObj.layers) {
                 for (let i = 0; i < convertedPsdObj.layers.length; i++) {
                     const item = convertedPsdObj.layers[i];
-                    BB.resizeCanvas(item.image, convertedPsdObj.width, convertedPsdObj.height);
+                    if (!item.groupId) {
+                        BB.resizeCanvas(item.image, convertedPsdObj.width, convertedPsdObj.height);
+                    }
                 }
             }
 
             let layerIndex;
             if (convertedPsdObj.layers) {
+                const groupIdMap = new Map<string, string>();
+                for (const layer of convertedPsdObj.layers) {
+                    if (layer.groupId) {
+                        groupIdMap.set(layer.groupId, randomUuid());
+                    }
+                }
                 layerIndex = this.klCanvas.reset({
                     width: convertedPsdObj.width,
                     height: convertedPsdObj.height,
@@ -166,6 +176,12 @@ export class KlAppImportHandler {
                             opacity: layer.opacity,
                             mixModeStr: layer.mixModeStr,
                             hasClipping: layer.hasClipping,
+                            groupId: layer.groupId ? groupIdMap.get(layer.groupId) : undefined,
+                            parentGroupId: layer.parentGroupId
+                                ? (groupIdMap.get(layer.parentGroupId) ?? null)
+                                : null,
+                            isExpanded: layer.isExpanded,
+                            isPassThrough: layer.isPassThrough,
                             image: layer.image,
                         };
                     }),

@@ -32,6 +32,7 @@ import { createTransformationComposite } from '../klecks/transform/create-transf
 import { THistoryExecutionType } from '../klecks/history/kl-history-executor';
 import { createSelectionSample, TSelectionSample } from '../klecks/transform/selection-sample';
 import { getFfdBounds } from '../klecks/transform/ffd-utils';
+import { isGroupLayer } from '../klecks/canvas/layer-tree';
 
 export type TSelectTransformTempEntry = {
     type: 'select-transform';
@@ -418,6 +419,9 @@ export class KlAppSelect {
 
                     // avoid changing state while mode-change can be rejected
                     const layerIndex = this.getCurrentLayerIndex();
+                    if (isGroupLayer(this.klCanvas.getLayer(layerIndex))) {
+                        return false;
+                    }
                     const selectionSample = createSelectionSample(layerIndex, this.klCanvas);
                     if (!selectionSample) {
                         setTimeout(() => {
@@ -629,7 +633,7 @@ export class KlAppSelect {
                     this.easelSelect.setTransform(this.transformState.transform);
                 },
                 onMoveToLayer: (index) => {
-                    if (!this.transformState) {
+                    if (!this.transformState || isGroupLayer(this.klCanvas.getLayer(index))) {
                         return;
                     }
                     this.resetKlCanvasLayerComposites();

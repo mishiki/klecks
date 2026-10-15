@@ -342,6 +342,10 @@ export const filterPattern = {
             opacity: layers[selectedLayerIndex].opacity,
             mixModeStr: layers[selectedLayerIndex].mixModeStr,
             hasClipping: layers[selectedLayerIndex].hasClipping,
+            groupId: layers[selectedLayerIndex].groupId,
+            parentGroupId: layers[selectedLayerIndex].parentGroupId,
+            isExpanded: layers[selectedLayerIndex].isExpanded,
+            isPassThrough: layers[selectedLayerIndex].isPassThrough,
         };
         const previewLayerArr = layers.map((item, i) => {
             if (i === selectedLayerIndex) {
@@ -353,6 +357,10 @@ export const filterPattern = {
                     opacity: item.opacity,
                     mixModeStr: item.mixModeStr,
                     hasClipping: item.hasClipping,
+                    groupId: item.groupId,
+                    parentGroupId: item.parentGroupId,
+                    isExpanded: item.isExpanded,
+                    isPassThrough: item.isPassThrough,
                 };
             }
         });

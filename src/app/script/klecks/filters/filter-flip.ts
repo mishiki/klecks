@@ -100,6 +100,10 @@ export const filterFlip = {
             opacity: item.opacity,
             mixModeStr: item.mixModeStr,
             hasClipping: item.hasClipping,
+            groupId: item.groupId,
+            parentGroupId: item.parentGroupId,
+            isExpanded: item.isExpanded,
+            isPassThrough: item.isPassThrough,
         }));
         const composedCanvas = klCanvas.getCanvas();
         const flippedCanvas = BB.canvas(composedCanvas.width, composedCanvas.height);

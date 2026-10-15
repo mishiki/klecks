@@ -70,6 +70,10 @@ export function serializeRecovery(
             opacity: composedLayer.opacity,
             mixModeStr: composedLayer.mixModeStr,
             hasClipping: composedLayer.hasClipping,
+            groupId: composedLayer.groupId,
+            parentGroupId: composedLayer.parentGroupId,
+            isExpanded: composedLayer.isExpanded,
+            isPassThrough: composedLayer.isPassThrough,
             image,
         });
     }
@@ -183,6 +187,9 @@ export async function deserializeRecovery(
             ...layer,
             mixModeStr: getMixModeStr(layer.mixModeStr),
             hasClipping: layer.hasClipping ?? false,
+            parentGroupId: layer.parentGroupId ?? null,
+            isExpanded: layer.isExpanded ?? true,
+            isPassThrough: layer.isPassThrough ?? false,
             image: deserializedTiles,
         });
     }

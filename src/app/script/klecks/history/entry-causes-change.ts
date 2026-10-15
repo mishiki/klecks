@@ -63,6 +63,27 @@ export function entryCausesChange(
             ) {
                 return true;
             }
+            if (entryLayer.groupId !== undefined && entryLayer.groupId !== composedLayer.groupId) {
+                return true;
+            }
+            if (
+                entryLayer.parentGroupId !== undefined &&
+                entryLayer.parentGroupId !== composedLayer.parentGroupId
+            ) {
+                return true;
+            }
+            if (
+                entryLayer.isExpanded !== undefined &&
+                entryLayer.isExpanded !== composedLayer.isExpanded
+            ) {
+                return true;
+            }
+            if (
+                entryLayer.isPassThrough !== undefined &&
+                entryLayer.isPassThrough !== composedLayer.isPassThrough
+            ) {
+                return true;
+            }
             if (entryLayer.index !== undefined && entryLayer.index !== composedLayer.index) {
                 return true;
             }

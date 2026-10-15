@@ -66,6 +66,10 @@ export class EaselProjectUpdater<T extends string> {
                     opacity: layer.opacity,
                     mixModeStr: layer.mixModeStr,
                     hasClipping: layer.hasClipping,
+                    groupId: layer.groupId,
+                    parentGroupId: layer.parentGroupId,
+                    isExpanded: layer.isExpanded,
+                    isPassThrough: layer.isPassThrough,
                 };
             }),
             selection: this.klCanvas.getSelection(),

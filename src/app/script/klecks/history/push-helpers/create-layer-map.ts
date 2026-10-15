@@ -2,6 +2,8 @@ import { TKlCanvasLayer } from '../../canvas/kl-canvas';
 import { THistoryEntryLayer, THistoryEntryLayerTile, TLayerId } from '../history.types';
 import { canvasToLayerTiles } from './canvas-to-layer-tiles';
 import { TIndexBounds } from '../../../bb/bb-types';
+import { isGroupLayer } from '../../canvas/layer-tree';
+import { createFillColorTiles } from '../create-fill-color-tiles';
 
 type TLayerKey = keyof THistoryEntryLayer;
 type TLayerMapGeneric = {
@@ -19,6 +21,7 @@ export type TLayerMapConfigItem = TLayerMapGeneric | TLayerMapLayer;
 function createEntryLayer(
     layer: TKlCanvasLayer,
     attributes: 'all' | TLayerKey[],
+    projectSize: { width: number; height: number },
     bounds?: TIndexBounds,
     tiles?: (THistoryEntryLayerTile | undefined)[],
 ): THistoryEntryLayer {
@@ -40,11 +43,25 @@ function createEntryLayer(
     if (useAll || attributes.includes('hasClipping')) {
         result.hasClipping = layer.hasClipping;
     }
+    if (useAll || attributes.includes('groupId')) {
+        result.groupId = layer.groupId ?? null;
+    }
+    if (useAll || attributes.includes('parentGroupId')) {
+        result.parentGroupId = layer.parentGroupId ?? null;
+    }
+    if (useAll || attributes.includes('isExpanded')) {
+        result.isExpanded = layer.isExpanded ?? true;
+    }
+    if (useAll || attributes.includes('isPassThrough')) {
+        result.isPassThrough = layer.isPassThrough ?? false;
+    }
     if (useAll || attributes.includes('index')) {
         result.index = layer.index;
     }
     if (useAll || attributes.includes('tiles')) {
-        result.tiles = tiles ?? canvasToLayerTiles(layer.context.canvas, bounds);
+        result.tiles = isGroupLayer(layer)
+            ? createFillColorTiles(projectSize.width, projectSize.height, 'transparent')
+            : (tiles ?? canvasToLayerTiles(layer.context.canvas, bounds));
     }
     return result;
 }
@@ -66,6 +83,10 @@ export function createLayerMap(
     layers: TKlCanvasLayer[],
     ...items: (TLayerMapConfigItem | undefined)[]
 ): Record<TLayerId, THistoryEntryLayer> {
+    const paintCanvas = layers.find((layer) => !isGroupLayer(layer))?.canvas;
+    const projectSize = paintCanvas
+        ? { width: paintCanvas.width, height: paintCanvas.height }
+        : { width: layers[0]?.canvas.width ?? 1, height: layers[0]?.canvas.height ?? 1 };
     const generic: TLayerMapGeneric = items.find((item) => item && !('layerId' in item)) ?? {
         attributes: [],
     };
@@ -79,11 +100,17 @@ export function createLayerMap(
                 if (target.layerId === layer.id) {
                     return [
                         layer.id,
-                        createEntryLayer(layer, target.attributes, target.bounds, target.tiles),
+                        createEntryLayer(
+                            layer,
+                            target.attributes,
+                            projectSize,
+                            target.bounds,
+                            target.tiles,
+                        ),
                     ];
                 }
             }
-            return [layer.id, createEntryLayer(layer, generic.attributes)];
+            return [layer.id, createEntryLayer(layer, generic.attributes, projectSize)];
         }),
     );
 }

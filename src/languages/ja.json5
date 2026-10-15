@@ -274,6 +274,10 @@
     original: 'Layer',
     value: 'レイヤー'
   },
+  'layers-group': {
+    original: 'Group',
+    value: 'グループ'
+  },
   'layers-copy': {
     hint: 'noun',
     original: 'copy',
@@ -288,6 +292,18 @@
     hint: 'action',
     original: 'New Layer',
     value: '新規'
+  },
+  'layers-new-group': {
+    original: 'New Group',
+    value: '新規グループ'
+  },
+  'layers-group-expand': {
+    original: 'Expand group',
+    value: 'グループを展開'
+  },
+  'layers-group-collapse': {
+    original: 'Collapse group',
+    value: 'グループを折りたたむ'
   },
   'layers-remove': {
     hint: 'action',
@@ -342,6 +358,10 @@
   'layers-blend-normal': {
     original: 'normal',
     value: '通常'
+  },
+  'layers-blend-pass-through': {
+    original: 'pass through',
+    value: '通過'
   },
   'layers-blend-multiply': {
     original: 'multiply',

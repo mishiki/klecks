@@ -76,6 +76,7 @@ import { getSelectionPath2d } from '../bb/multi-polygon/get-selection-path-2d';
 import { ToolspaceTopRow } from '../klecks/ui/components/toolspace-top-row';
 import { setupUnfocusOnClickService } from '../klecks/ui/onfocus-on-click-service';
 import { FloatingLayerPreview } from '../klecks/ui/components/floating-layer-preview';
+import { isGroupLayer } from '../klecks/canvas/layer-tree';
 
 const toolPaintImg = getIconUrl('tool-paint');
 const toolHandImg = getIconUrl('tool-hand');
@@ -352,6 +353,9 @@ export class KlApp {
         let mainTabRow: TabRow | undefined = undefined;
 
         const clearLayer = (showStatus?: boolean, ignoreSelection?: boolean) => {
+            if (isCurrentLayerGroup()) {
+                return;
+            }
             applyUncommitted();
             const layerIndex = currentLayerIndex;
             this.klCanvas.eraseLayer({
@@ -390,6 +394,7 @@ export class KlApp {
         });
         let lastNonEraserBrushId: TBrushId;
         let currentLayerIndex: number = this.klCanvas.getLayerCount() - 1;
+        const isCurrentLayerGroup = () => isGroupLayer(this.klCanvas.getLayer(currentLayerIndex));
 
         // when cycling through brushes you need to know the next non-eraser brush
         const getNextBrushId = (): TBrushId => {
@@ -445,6 +450,12 @@ export class KlApp {
         });
 
         drawEventChain.setChainOut(((event: TDrawEvent) => {
+            if (isCurrentLayerGroup()) {
+                if (event.type === 'up') {
+                    this.toolspace.style.pointerEvents = '';
+                }
+                return;
+            }
             const diagnosticStart = DIAGNOSTICS.isRecording() ? performance.now() : undefined;
             if (diagnosticStart !== undefined) {
                 DIAGNOSTICS.record('brush.dispatch', { ...event, brushId: currentBrushId });
@@ -568,6 +579,9 @@ export class KlApp {
             tempHistory,
             statusOverlay: this.statusOverlay,
             onFill: () => {
+                if (isCurrentLayerGroup()) {
+                    return;
+                }
                 this.klCanvas.layerFill(
                     currentLayerIndex,
                     this.klColorSlider.getColor(),
@@ -580,6 +594,9 @@ export class KlApp {
                 );
             },
             onErase: () => {
+                if (isCurrentLayerGroup()) {
+                    return;
+                }
                 const layerIndex = currentLayerIndex;
                 this.klCanvas.eraseLayer({
                     layerIndex,
@@ -660,7 +677,9 @@ export class KlApp {
         let isFirstTransform = true;
         this.easel = new Easel({
             onBeforeRender: () => {
-                currentBrushUi?.getBrush().transferToCanvas?.();
+                if (!isCurrentLayerGroup()) {
+                    currentBrushUi?.getBrush().transferToCanvas?.();
+                }
             },
             width: Math.max(0, this.uiWidth - this.toolWidth),
             height: this.uiHeight,
@@ -695,6 +714,9 @@ export class KlApp {
                 }),
                 paintBucket: new EaselPaintBucket({
                     onFill: (p) => {
+                        if (isCurrentLayerGroup()) {
+                            return;
+                        }
                         this.klCanvas.floodFill(
                             currentLayerIndex,
                             p.x,
@@ -722,7 +744,7 @@ export class KlApp {
                 }),
                 text: new EaselText({
                     onDown: (p, angleRad) => {
-                        if (KL.DIALOG_COUNTER.get() > 0) {
+                        if (KL.DIALOG_COUNTER.get() > 0 || isCurrentLayerGroup()) {
                             return;
                         }
 
@@ -771,7 +793,9 @@ export class KlApp {
                                         ),
                                     );
                                 }
-                                this.klCanvas.text(currentLayerIndex, val);
+                                if (!isCurrentLayerGroup()) {
+                                    this.klCanvas.text(currentLayerIndex, val);
+                                }
                             },
                         });
                     },
@@ -981,7 +1005,7 @@ export class KlApp {
                     );
                 }
                 if (comboStr === 'enter' && !isRepeat) {
-                    if (!applyUncommitted()) {
+                    if (!applyUncommitted() && !isCurrentLayerGroup()) {
                         this.klCanvas.layerFill(
                             currentLayerIndex,
                             this.klColorSlider.getColor(),
@@ -1562,6 +1586,9 @@ export class KlApp {
 
         const gradientTool = new KL.GradientTool({
             onGradient: (isDone, x1, y1, x2, y2, angleRad) => {
+                if (isCurrentLayerGroup()) {
+                    return;
+                }
                 const layerIndex = currentLayerIndex;
                 const settings = gradientUi.getSettings();
                 const gradientObj: TGradient = {
@@ -1600,6 +1627,9 @@ export class KlApp {
 
         const shapeTool = new KL.ShapeTool({
             onShape: (isDone, x1, y1, x2, y2, angleRad) => {
+                if (isCurrentLayerGroup()) {
+                    return;
+                }
                 const layerIndex = currentLayerIndex;
 
                 const shapeObj: any = {

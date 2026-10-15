@@ -4,6 +4,7 @@ import { THistoryEntryDataComposed } from '../history/history.types';
 import { BB } from '../../bb/bb';
 import { sortLayerMap } from '../history/sort-layer-map';
 import { isLayerFill } from '../kl-types';
+import { isGroupLayer } from './layer-tree';
 
 /**
  * Applies history delta to the project, optimized for performance.
@@ -24,7 +25,13 @@ export function updateLayersViaComposed(
             const composedBeforeLayer = before.layerMap[id];
             const tilesPerX = Math.ceil(after.size.width / HISTORY_TILE_SIZE);
 
-            if (sizeDidChange || !composedBeforeLayer) {
+            if (isGroupLayer(composedAfterLayer)) {
+                const previous = composedBeforeLayer && layers[composedBeforeLayer.index];
+                canvas = previous && isGroupLayer(composedBeforeLayer)
+                    ? previous.canvas
+                    : BB.canvas(1, 1);
+                context = BB.ctx(canvas);
+            } else if (sizeDidChange || !composedBeforeLayer || isGroupLayer(composedBeforeLayer)) {
                 // create new canvas
                 canvas = BB.canvas(after.size.width, after.size.height);
                 context = BB.ctx(canvas);
@@ -94,6 +101,10 @@ export function updateLayersViaComposed(
                 hasClipping: composedAfterLayer.hasClipping,
                 isVisible: composedAfterLayer.isVisible,
                 opacity: composedAfterLayer.opacity,
+                groupId: composedAfterLayer.groupId,
+                parentGroupId: composedAfterLayer.parentGroupId,
+                isExpanded: composedAfterLayer.isExpanded,
+                isPassThrough: composedAfterLayer.isPassThrough,
                 canvas,
                 context,
             };

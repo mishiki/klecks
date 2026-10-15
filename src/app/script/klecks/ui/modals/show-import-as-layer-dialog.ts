@@ -104,6 +104,10 @@ export function showImportAsLayerDialog(params: {
                 opacity: klCanvasLayerArr[i].opacity,
                 mixModeStr: klCanvasLayerArr[i].mixModeStr,
                 hasClipping: klCanvasLayerArr[i].hasClipping,
+                groupId: klCanvasLayerArr[i].groupId,
+                parentGroupId: klCanvasLayerArr[i].parentGroupId,
+                isExpanded: klCanvasLayerArr[i].isExpanded,
+                isPassThrough: klCanvasLayerArr[i].isPassThrough,
             });
         }
     }

@@ -62,6 +62,10 @@ function composeLayer(
         isVisible: getLatestDefinedProp(layerEntries, 'isVisible'),
         mixModeStr: getLatestDefinedProp(layerEntries, 'mixModeStr'),
         hasClipping: getLatestDefinedProp(layerEntries, 'hasClipping'),
+        groupId: getLatestDefinedProp(layerEntries, 'groupId', null as string | null),
+        parentGroupId: getLatestDefinedProp(layerEntries, 'parentGroupId', null as string | null),
+        isExpanded: getLatestDefinedProp(layerEntries, 'isExpanded', true as boolean),
+        isPassThrough: getLatestDefinedProp(layerEntries, 'isPassThrough', false as boolean),
         index: getLatestDefinedProp(layerEntries, 'index'),
         tiles: composeLayerTiles(layerEntries.map((item) => (item ? item.tiles : undefined))),
     };

@@ -225,6 +225,7 @@ Renaming a key across multiple language files:
     value: 'Active Layer'
   },
   "layers-layer": "Layer",
+  "layers-group": "Group",
   "layers-copy": {
     hint: 'noun',
     value: 'copy',
@@ -237,6 +238,9 @@ Renaming a key across multiple language files:
     "hint": "action",
     "value": "New Layer"
   },
+  "layers-new-group": "New Group",
+  "layers-group-expand": "Expand group",
+  "layers-group-collapse": "Collapse group",
   "layers-remove": {
     "hint": "action",
     "value": "Remove Layer"
@@ -276,6 +280,7 @@ Renaming a key across multiple language files:
   // Layer blend modes as seen in Photoshop and other image editing software
 
   "layers-blend-normal": "normal",
+  "layers-blend-pass-through": "pass through",
   "layers-blend-multiply": "multiply",
   "layers-blend-screen": "screen",
   "layers-blend-overlay": "overlay",

@@ -11,6 +11,9 @@ export function getPushableLayerChange(
     imageOrTiles: HTMLCanvasElement | (THistoryEntryLayerTile | undefined)[],
 ): THistoryEntryData {
     const activeLayerId = composed.activeLayerId;
+    if (composed.layerMap[activeLayerId]?.groupId) {
+        return {};
+    }
     const layerMap = Object.fromEntries(
         Object.entries(composed.layerMap).map(([layerId, layerItem]) => {
             if (layerId === activeLayerId) {

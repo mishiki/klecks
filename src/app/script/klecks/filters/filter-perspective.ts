@@ -117,6 +117,10 @@ export const filterPerspective = {
                     opacity: layers[i].opacity,
                     mixModeStr: layers[i].mixModeStr,
                     hasClipping: layers[i].hasClipping,
+                    groupId: layers[i].groupId,
+                    parentGroupId: layers[i].parentGroupId,
+                    isExpanded: layers[i].isExpanded,
+                    isPassThrough: layers[i].isPassThrough,
                 });
             }
         }

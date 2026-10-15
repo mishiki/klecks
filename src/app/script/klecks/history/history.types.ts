@@ -31,6 +31,12 @@ export type THistoryEntryLayer = {
     // if clipping changed
     hasClipping?: boolean;
 
+    // Folder tree metadata. null clears a relationship; undefined means unchanged.
+    groupId?: string | null;
+    parentGroupId?: string | null;
+    isExpanded?: boolean;
+    isPassThrough?: boolean;
+
     // if index changed (did it move up or down)
     index?: number;
 

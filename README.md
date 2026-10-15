@@ -1,7 +1,7 @@
 # Personal Klecks fork
 
 This fork starts with these changes:
-- Up to 255 paint layers.
+- Up to 255 layers, including folders.
 - New documents start with a transparent paint layer and a separate white background.
 - White/transparent background selection in New Image and below the layer list.
 - Background state follows undo/redo, browser storage, recovery, and image exports.
@@ -15,8 +15,19 @@ In Settings, Diagnostics starts a local recording for up to two minutes. Switch 
 
 Timing values measure JavaScript work and requestAnimationFrame cadence, not completed GPU work or CPU/GPU utilization. Layer RGBA memory is a theoretical estimate, separate from the optional JS heap measurement. Unsupported browser information is reported as unavailable. Diagnostics itself adds some overhead; it is off by default.
 
-Build and launch commands are listed below. Layer folders, magic wand, and SAI2 import/export are not part of this initial change.
+Build and launch commands are listed below. Magic wand and SAI2 import/export are still planned.
 
+
+
+## Layer folders: stage 2
+
+The former rename button now adds a folder. Names can still be renamed by double-clicking. Drag onto the middle of a folder row to move inside; its upper/lower edge moves above/below it. The triangle folds its children. Adding a paint layer while a folder is selected puts it inside.
+
+Folders support nesting, visibility, opacity, isolated blend modes, and pass-through. A clipping layer immediately above a folder uses that folder's composite as its base; clipping chains remain within the same parent. A clipped pass-through folder is isolated to provide that base. Folders hold no paint pixels, so paint, selection transforms, and layer filters require selecting a paint layer. Duplicate/delete operate on the whole subtree. Merge-down requires two paint siblings; Merge All flattens the document.
+
+Hierarchy is included in undo/redo, browser saves/recovery, and PSD import/export. Folders count toward the 255-layer cap. Masks are not editable yet: PSD masks are still applied on import, with a warning; applying a group mask to individual children can differ from masking the completed composite. Group masks are part of stage 3.
+
+This stage awaits human drawing/UI verification on Windows and Xiaomi Pad. Check nested folders, moves in/out, visibility/opacity, pass-through versus normal, clipping above folders, undo/redo, and PSD save/reopen. Static type/build checks do not establish pixel parity with SAI2 or Photoshop.
 
 ## Layer blend modes: stage 1
 
@@ -26,7 +37,7 @@ Existing Canvas2D modes retain their native rendering path. Extended modes use a
 
 The implementation follows the existing SAI2-to-PSD mapping, [Adobe's blend-mode descriptions](https://helpx.adobe.com/photoshop/desktop/repair-retouch/adjust-light-tone/blending-mode-descriptions.html) and [W3C alpha compositing](https://www.w3.org/TR/compositing-1/). This is not a claim of pixel-exact SAI2/Photoshop compatibility: application-specific opacity, rounding and color-management behavior need human comparison. GPU execution and drawing/UI behavior have not been tested by Codex.
 
-Human acceptance for this stage: reopen the PSD containing 発光; compare the individual modes at full and partial opacity against SAI2; check transparent edges and clipping; save/reopen a PSD and check mode names and appearance. Existing group/mask import warnings remain until subsequent stages. Wait for human feedback before stage 2.
+Human acceptance for this stage: reopen the PSD containing 発光; compare the individual modes at full and partial opacity against SAI2; check transparent edges and clipping; save/reopen a PSD and check mode names and appearance. Color reproduction was confirmed manually before stage 2. Editable masks remain a later stage.
 
 ## Personal fork backlog (2026-10-15)
 
@@ -45,7 +56,7 @@ User confirmed all three as essential after importing an existing PSD:
 2. All blend modes supported by SAI2: inventory the actual SAI2 modes and rendering behavior before implementation; map PSD equivalents where possible and explicitly handle modes without an equivalent. Matching names alone does not establish matching output. The user identified the unsupported mode in the reported PSD as SAI2 発光 (Shine). Existing sai2-parser docs/format-notes.md and crates/sai2-psd/src/lib.rs map SAI2 `add ` to PSD `lddg` (Linear Dodge/Add). Before stage 1, Klecks storage/psd.ts lacked that mapping and fell back to normal with a warning; stage 1 adds the mapping and rendering path. Reuse the existing SAI2/PSD inventory rather than reconstructing it from names; retain its stated uncertainties (especially the provisional Pin Light correspondence). The reported PSD binary itself has not been inspected.
 3. Non-destructive layer masks: retain masks as separately editable data rather than baking them into pixels. Account for group masks as part of the group/mask design.
 
-Current PSD conversion (src/app/script/klecks/storage/psd.ts) loses group structure, applies masks to pixels, and warns about unsupported blend modes. The reported warning is evidence of conversion limitations, not proof that the image is preserved exactly.
+Stage 2 PSD conversion (src/app/script/klecks/storage/psd.ts) preserves group structure, still applies masks to pixels, and warns about unsupported features. The reported warning is evidence of conversion limitations, not proof that the image is preserved exactly.
 
 Design the layer tree, masks and compositing together before implementing individual UI controls. Include undo/redo, browser persistence/recovery, and PSD import/export in the scope so structures survive saving and reopening. SAI2 import/export remains a subsequent compatibility goal. Existing required magic-wand selection work remains on the backlog.
 

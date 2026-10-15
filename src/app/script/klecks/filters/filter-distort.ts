@@ -306,6 +306,10 @@ export const filterDistort = {
                 opacity: item.opacity,
                 mixModeStr: item.mixModeStr,
                 hasClipping: item.hasClipping,
+                groupId: item.groupId,
+                parentGroupId: item.parentGroupId,
+                isExpanded: item.isExpanded,
+                isPassThrough: item.isPassThrough,
             };
         });
         const preview = new Preview({

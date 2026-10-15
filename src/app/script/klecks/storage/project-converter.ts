@@ -29,6 +29,10 @@ export type TKlStorageProjectRead = {
         opacity: number; // 0 - 1
         mixModeStr: TMixMode;
         hasClipping?: boolean;
+        groupId?: string | null;
+        parentGroupId?: string | null;
+        isExpanded?: boolean;
+        isPassThrough?: boolean;
         blob?: Blob; // png
     }[];
 };
@@ -49,6 +53,10 @@ export type TKlStorageProjectWrite = {
         opacity: number; // 0 - 1
         mixModeStr: TMixMode;
         hasClipping: boolean;
+        groupId?: string | null;
+        parentGroupId?: string | null;
+        isExpanded?: boolean;
+        isPassThrough?: boolean;
         blob: Blob; // png
     }[];
 };
@@ -88,6 +96,10 @@ export class ProjectConverter {
                 opacity: item.opacity,
                 mixModeStr: item.mixModeStr,
                 hasClipping: item.hasClipping,
+                groupId: item.groupId,
+                parentGroupId: item.parentGroupId,
+                isExpanded: item.isExpanded,
+                isPassThrough: item.isPassThrough,
                 blob,
             });
         }
@@ -146,6 +158,10 @@ export class ProjectConverter {
                     opacity: storageLayer.opacity,
                     mixModeStr: storageLayer.mixModeStr,
                     hasClipping: storageLayer.hasClipping ?? false,
+                    groupId: storageLayer.groupId,
+                    parentGroupId: storageLayer.parentGroupId ?? null,
+                    isExpanded: storageLayer.isExpanded ?? true,
+                    isPassThrough: storageLayer.isPassThrough ?? false,
                     image,
                 };
             }),

@@ -21,7 +21,7 @@ export class SaveToComputer {
         const fileBase = getFilenameDate() + KL_CONFIG.filenameBase;
 
         if (format === 'layers') {
-            const layers = this.klCanvas.getLayers();
+            const layers = this.klCanvas.getLayers().filter((layer) => !layer.groupId);
             for (let i = 0; i < layers.length; i++) {
                 const layer = layers[i];
                 const result = await saveAs(
