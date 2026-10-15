@@ -39,7 +39,13 @@ Current PSD conversion (src/app/script/klecks/storage/psd.ts) loses group struct
 
 Design the layer tree, masks and compositing together before implementing individual UI controls. Include undo/redo, browser persistence/recovery, and PSD import/export in the scope so structures survive saving and reopening. SAI2 import/export remains a subsequent compatibility goal. Existing required magic-wand selection work remains on the backlog.
 
-Drawing, visual fidelity and interaction verification remain human tasks; do not run automated browser/drawing tests without a new request. Implementation order is not yet finalized.
+Implementation order agreed with the user:
+
+1. Layer blend modes: implement the SAI2 mode inventory, including 発光 / Linear Dodge (Add), with import/export mappings. Deliver a usable build for human checks of rendering and file compatibility.
+2. Layer groups: support nested groups and clipping layers above a group, using the group as the clipping base. Deliver a usable build for human checks of group operations, compositing and saved structure.
+3. Layer masks: support non-destructive masks on both individual layers and layer groups. Deliver a usable build for human checks of mask editing, group masking and saved structure.
+
+At each stage, incorporate human verification feedback before proceeding to the next stage. Plan the shared data/compositing model with later group masks in mind, but deliver features in the order above. Drawing, visual fidelity and interaction verification remain human tasks; do not run automated browser/drawing tests without a new request.
 
 ---
 
