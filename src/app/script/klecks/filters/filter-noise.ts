@@ -369,7 +369,7 @@ export const filterNoise = {
             name: 'reverse-gradient',
         });
 
-        const mixModes: (TMixMode | undefined)[] = [
+        const mixModes: (Extract<TMixMode, GlobalCompositeOperation> | undefined)[] = [
             'source-over',
             undefined,
             'darken',
@@ -396,7 +396,7 @@ export const filterNoise = {
         const blendSelect = new SelectCustom({
             isFocusable: true,
             optionArr: mixModes.map((item) => {
-                return item ? ([item, translateBlending(item)] as [TMixMode, string]) : undefined;
+                return item ? ([item, translateBlending(item)] as [Extract<TMixMode, GlobalCompositeOperation>, string]) : undefined;
             }),
             initValue: noiseInput.mixModeStr,
             onChange: (val: GlobalCompositeOperation) => {

@@ -47,22 +47,31 @@ export type TFilter = {
     webGL?: boolean; // does the filter require webgl
 };
 
-// A subset of CanvasRenderingContext2D.globalCompositeOperation.
-// Blend modes only affect pixels where the destination is non-transparent,
-// so it's safe to draw with that on an empty canvas.
+// Native and extended layer blend modes. Use drawBlended rather than assigning
+// these directly to globalCompositeOperation: Canvas2D does not support all modes.
 export type TMixMode =
     | 'source-over' // default aka normal
-    | 'darken'
     | 'multiply'
-    | 'color-burn'
-    | 'lighten'
     | 'screen'
-    | 'color-dodge'
     | 'overlay'
+    | 'linear-burn'
+    | 'linear-dodge'
+    | 'linear-light'
+    | 'color-burn'
+    | 'color-dodge'
+    | 'vivid-light'
     | 'soft-light'
     | 'hard-light'
+    | 'pin-light'
+    | 'hard-mix'
+    | 'darken'
+    | 'lighten'
+    | 'darker-color'
+    | 'lighter-color'
     | 'difference'
     | 'exclusion'
+    | 'subtract'
+    | 'divide'
     | 'hue'
     | 'saturation'
     | 'color'

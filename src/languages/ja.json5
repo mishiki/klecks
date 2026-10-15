@@ -343,33 +343,41 @@
     original: 'normal',
     value: '通常'
   },
-  'layers-blend-darken': {
-    original: 'darken',
-    value: '比較(暗)'
-  },
   'layers-blend-multiply': {
     original: 'multiply',
     value: '乗算'
-  },
-  'layers-blend-color-burn': {
-    original: 'color burn',
-    value: '焼き込み'
-  },
-  'layers-blend-lighten': {
-    original: 'lighten',
-    value: '比較(明)'
   },
   'layers-blend-screen': {
     original: 'screen',
     value: 'スクリーン'
   },
+  'layers-blend-overlay': {
+    original: 'overlay',
+    value: 'オーバーレイ'
+  },
+  'layers-blend-linear-burn': {
+    original: 'linear burn',
+    value: '陰影'
+  },
+  'layers-blend-linear-dodge': {
+    original: 'linear dodge',
+    value: '発光'
+  },
+  'layers-blend-linear-light': {
+    original: 'linear light',
+    value: '明暗'
+  },
+  'layers-blend-color-burn': {
+    original: 'color burn',
+    value: '焼き込み'
+  },
   'layers-blend-color-dodge': {
     original: 'color dodge',
     value: '覆い焼き'
   },
-  'layers-blend-overlay': {
-    original: 'overlay',
-    value: 'オーバーレイ'
+  'layers-blend-vivid-light': {
+    original: 'vivid light',
+    value: '焼き・覆い'
   },
   'layers-blend-soft-light': {
     original: 'soft light',
@@ -379,6 +387,30 @@
     original: 'hard light',
     value: 'ハードライト'
   },
+  'layers-blend-pin-light': {
+    original: 'pin light',
+    value: 'ピンライト'
+  },
+  'layers-blend-hard-mix': {
+    original: 'hard mix',
+    value: 'ハードミックス'
+  },
+  'layers-blend-darken': {
+    original: 'darken',
+    value: '比較（暗）'
+  },
+  'layers-blend-lighten': {
+    original: 'lighten',
+    value: '比較（明）'
+  },
+  'layers-blend-darker-color': {
+    original: 'darker color',
+    value: 'カラー比較（暗）'
+  },
+  'layers-blend-lighter-color': {
+    original: 'lighter color',
+    value: 'カラー比較（明）'
+  },
   'layers-blend-difference': {
     original: 'difference',
     value: '差の絶対値'
@@ -386,6 +418,14 @@
   'layers-blend-exclusion': {
     original: 'exclusion',
     value: '除外'
+  },
+  'layers-blend-subtract': {
+    original: 'subtract',
+    value: '減算'
+  },
+  'layers-blend-divide': {
+    original: 'divide',
+    value: '除算'
   },
   'layers-blend-hue': {
     original: 'hue',

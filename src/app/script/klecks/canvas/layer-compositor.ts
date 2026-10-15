@@ -1,7 +1,8 @@
+import { drawBlended } from './draw-blended';
 import { createCanvas } from '../../bb/base/create-canvas';
 import { ctx, freeCanvas } from '../../bb/base/canvas';
 import { changeCanvasDimensions } from '../../bb/base/change-canvas-dimensions';
-import type { TKlLayer } from '../kl-types';
+import type { TKlLayer, TMixMode } from '../kl-types';
 import { getClippingGroups } from './get-clipping-groups';
 
 type TCompositeLayer = Omit<TKlLayer<unknown>, 'image'>;
@@ -24,15 +25,8 @@ export class LayerCompositor {
             return this.canvas;
         }
         const target = ctx(this.canvas);
-        const draw = (layer: GLayer, mode: GlobalCompositeOperation): void => {
-            target.save();
-            try {
-                target.globalAlpha = layer.opacity;
-                target.globalCompositeOperation = mode;
-                drawLayer(target, layer);
-            } finally {
-                target.restore();
-            }
+        const draw = (layer: GLayer, mode: TMixMode | GlobalCompositeOperation): void => {
+            drawBlended(target, mode, layer.opacity, (context) => drawLayer(context, layer));
         };
         layers.forEach((layer) => {
             if (layer.isVisible && layer.opacity) {
@@ -57,24 +51,21 @@ export class LayerCompositor {
             if (!base.isVisible || base.opacity === 0) {
                 continue;
             }
-            targetCtx.save();
-            try {
-                targetCtx.globalCompositeOperation = base.mixModeStr;
-                targetCtx.globalAlpha = base.opacity;
-                if (group.length === 1) {
-                    drawLayer(targetCtx, base);
-                } else {
-                    const image = this.drawGroup(
-                        group,
-                        clippingCanvasWidth,
-                        clippingCanvasHeight,
-                        drawLayer,
-                    );
-                    targetCtx.globalAlpha = 1;
-                    targetCtx.drawImage(image, 0, 0);
-                }
-            } finally {
-                targetCtx.restore();
+            if (group.length === 1) {
+                drawBlended(targetCtx, base.mixModeStr, base.opacity, (context) =>
+                    drawLayer(context, base),
+                );
+            } else {
+                // Finish the clipping composite before using the shared blend scratch canvas.
+                const image = this.drawGroup(
+                    group,
+                    clippingCanvasWidth,
+                    clippingCanvasHeight,
+                    drawLayer,
+                );
+                drawBlended(targetCtx, base.mixModeStr, 1, (context) =>
+                    context.drawImage(image, 0, 0),
+                );
             }
         }
     }

@@ -1,5 +1,6 @@
 import { hasUnchangedPsdBackground } from './psd-background';
 import { createCanvas } from '../../bb/base/create-canvas';
+import { drawBlended } from '../canvas/draw-blended';
 import { BlendMode, Layer, Psd } from 'ag-psd/dist/psd';
 import { TKlProject, TKlPsd, TKlPsdError, TKlPsdLayer, TMixMode } from '../kl-types';
 import { LANG } from '../../language/language';
@@ -20,6 +21,16 @@ function init(): void {
         darken: 'darken',
         multiply: 'multiply',
         'color-burn': 'color burn',
+        'linear-burn': 'linear burn',
+        'linear-dodge': 'linear dodge',
+        'linear-light': 'linear light',
+        'vivid-light': 'vivid light',
+        'pin-light': 'pin light',
+        'hard-mix': 'hard mix',
+        'darker-color': 'darker color',
+        'lighter-color': 'lighter color',
+        subtract: 'subtract',
+        divide: 'divide',
 
         lighten: 'lighten',
         screen: 'screen',
@@ -206,9 +217,9 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
                             if (groupCtx === undefined) {
                                 throw new Error('groupCtx undefined');
                             }
-                            groupCtx.globalCompositeOperation = innerItem.mixModeStr;
-                            groupCtx.globalAlpha = innerItem.opacity;
-                            groupCtx.drawImage(innerItem.image, 0, 0);
+                            drawBlended(groupCtx, innerItem.mixModeStr, innerItem.opacity, (ctx) => {
+                                ctx.drawImage(innerItem.image, 0, 0);
+                            });
                         } else {
                             innerItem.opacity = innerItem.opacity * groupOpacity;
                             resultArr.push(innerItem);
@@ -290,9 +301,14 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
 
                 if (groupCanvas && groupCtx) {
                     if (groupOpacity > 0) {
-                        groupCtx.globalCompositeOperation = getMixModeStr(item.blendMode);
-                        groupCtx.globalAlpha = item.hidden ? 0 : item.opacity;
-                        groupCtx.drawImage(canvas, 0, 0);
+                        drawBlended(
+                            groupCtx,
+                            getMixModeStr(item.blendMode),
+                            item.hidden ? 0 : item.opacity,
+                            (ctx) => {
+                                ctx.drawImage(canvas, 0, 0);
+                            },
+                        );
                     }
                 } else {
                     if (item.name === undefined) {

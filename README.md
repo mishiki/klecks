@@ -18,6 +18,16 @@ Timing values measure JavaScript work and requestAnimationFrame cadence, not com
 Build and launch commands are listed below. Layer folders, magic wand, and SAI2 import/export are not part of this initial change.
 
 
+## Layer blend modes: stage 1
+
+The layer menu now contains the 26 modes from the supplied SAI2 menu, in that order. Added modes are linear burn (陰影), linear dodge/add (発光), linear light (明暗), vivid light (焼き・覆い), pin light, hard mix, darker/lighter color, subtract and divide. PSD import/export and browser recovery retain their mode identifiers.
+
+Existing Canvas2D modes retain their native rendering path. Extended modes use an on-demand WebGL composite with a CPU fallback. The same layer compositor is used by the viewport, previews, merged output and layer merge; PSD group conversion also uses the blend helper. No SAI2 file reader/writer, editable groups or masks are introduced by this stage.
+
+The implementation follows the existing SAI2-to-PSD mapping, [Adobe's blend-mode descriptions](https://helpx.adobe.com/photoshop/desktop/repair-retouch/adjust-light-tone/blending-mode-descriptions.html) and [W3C alpha compositing](https://www.w3.org/TR/compositing-1/). This is not a claim of pixel-exact SAI2/Photoshop compatibility: application-specific opacity, rounding and color-management behavior need human comparison. GPU execution and drawing/UI behavior have not been tested by Codex.
+
+Human acceptance for this stage: reopen the PSD containing 発光; compare the individual modes at full and partial opacity against SAI2; check transparent edges and clipping; save/reopen a PSD and check mode names and appearance. Existing group/mask import warnings remain until subsequent stages. Wait for human feedback before stage 2.
+
 ## Personal fork backlog (2026-10-15)
 
 ### Possible upstream bug: inconsistent dimension limits
@@ -32,7 +42,7 @@ Build and launch commands are listed below. Layer folders, magic wand, and SAI2 
 User confirmed all three as essential after importing an existing PSD:
 
 1. Layer groups: preserve nested hierarchy rather than ungrouping or compositing imported groups; support group editing, visibility, opacity and group compositing semantics. A group must also be a clipping base: a sibling layer above the group can clip to the group composite, rather than to an individual child. Preserve this relationship through edits, undo, storage and file round trips; account for group masks, opacity and pass-through behavior when defining the composite.
-2. All blend modes supported by SAI2: inventory the actual SAI2 modes and rendering behavior before implementation; map PSD equivalents where possible and explicitly handle modes without an equivalent. Matching names alone does not establish matching output. The user identified the unsupported mode in the reported PSD as SAI2 発光 (Shine). Existing sai2-parser docs/format-notes.md and crates/sai2-psd/src/lib.rs map SAI2 `add ` to PSD `lddg` (Linear Dodge/Add). Klecks storage/psd.ts currently lacks that mapping and falls back to normal with a warning. Reuse the existing SAI2/PSD inventory rather than reconstructing it from names; retain its stated uncertainties (especially the provisional Pin Light correspondence). The reported PSD binary itself has not been inspected.
+2. All blend modes supported by SAI2: inventory the actual SAI2 modes and rendering behavior before implementation; map PSD equivalents where possible and explicitly handle modes without an equivalent. Matching names alone does not establish matching output. The user identified the unsupported mode in the reported PSD as SAI2 発光 (Shine). Existing sai2-parser docs/format-notes.md and crates/sai2-psd/src/lib.rs map SAI2 `add ` to PSD `lddg` (Linear Dodge/Add). Before stage 1, Klecks storage/psd.ts lacked that mapping and fell back to normal with a warning; stage 1 adds the mapping and rendering path. Reuse the existing SAI2/PSD inventory rather than reconstructing it from names; retain its stated uncertainties (especially the provisional Pin Light correspondence). The reported PSD binary itself has not been inspected.
 3. Non-destructive layer masks: retain masks as separately editable data rather than baking them into pixels. Account for group masks as part of the group/mask design.
 
 Current PSD conversion (src/app/script/klecks/storage/psd.ts) loses group structure, applies masks to pixels, and warns about unsupported blend modes. The reported warning is evidence of conversion limitations, not proof that the image is preserved exactly.
