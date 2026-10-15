@@ -333,6 +333,17 @@
     original: 'Merge all',
     value: ''
   },
+  'layers-image-target': { original: 'Edit layer pixels', value: 'レイヤー画像を編集' },
+  'layers-mask-target': { original: 'Edit layer mask', value: 'レイヤーマスクを編集' },
+  'layers-mask-disabled': { original: 'Layer mask disabled (click to edit)', value: 'マスクは無効です（クリックして編集）' },
+  'layers-mask-add': { original: 'Add layer mask', value: 'レイヤーマスクを追加' },
+  'layers-mask-remove': { original: 'Remove layer mask', value: 'レイヤーマスクを削除' },
+  'layers-mask-toggle': { original: 'Enable / disable layer mask', value: 'レイヤーマスクの有効・無効を切り替え' },
+  'layers-mask-invert': { original: 'Invert layer mask', value: 'レイヤーマスクを反転' },
+  'layers-mask-clear': { original: 'Fill layer mask with white', value: 'レイヤーマスクを白で塗りつぶす' },
+  'layers-mask-paint': { original: 'Mask: black hides, white reveals', value: 'マスク：黒で隠す、白で表示' },
+  'layers-mask-black': { original: 'Hide (black)', value: '隠す（黒）' },
+  'layers-mask-white': { original: 'Reveal (white)', value: '表示（白）' },
   'layers-rename': {
     hint: 'action',
     original: 'Rename',
@@ -1372,6 +1383,14 @@
   'import-psd-size': {
     original: 'Image size',
     value: '画像のサイズ'
+  },
+  'import-mask-effects-unsupported': {
+    original: 'Vector masks and mask effects are not fully supported. Raster masks remain editable.',
+    value: 'ベクターマスクやマスクの追加効果は未対応です。通常のレイヤーマスクは編集可能な状態で保持しています。'
+  },
+  'import-adjustment-placeholder': {
+    original: 'Adjustment effects are not reproduced. Layer names and types are retained as transparent layers.',
+    value: '調整効果は再現していません。調整レイヤーの種類と名前を透明レイヤーとして残しています。'
   },
   'clipboard-read-fail': {
     original: 'Failed to read from clipboard.',

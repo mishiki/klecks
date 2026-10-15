@@ -2,7 +2,7 @@ import { hasUnchangedPsdBackground } from './psd-background';
 import { createCanvas } from '../../bb/base/create-canvas';
 import { BlendMode, Layer, Psd } from 'ag-psd/dist/psd';
 import { TKlProject, TKlPsd, TKlPsdError, TKlPsdLayer, TMixMode } from '../kl-types';
-import { LANG } from '../../language/language';
+import { LANG, LANGUAGE_STRINGS } from '../../language/language';
 import { MAX_LAYERS } from '../canvas/kl-canvas';
 import { BB } from '../../bb/bb';
 import { randomUuid } from '../../bb/base/base';
@@ -106,10 +106,10 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
         psdObj = { ...psdObj, children: psdObj.children.slice(1) };
     }
 
-    // A folder is a real layer in Klecks. Count it even though its image is only a placeholder.
+    // Folders and adjustment placeholders are real layers in Klecks.
     function countLayers(children: Layer[]): number {
         return children.reduce(
-            (count, item) => count + (item.adjustment ? 0 : 1 + countLayers(item.children ?? [])),
+            (count, item) => count + 1 + countLayers(item.children ?? []),
             0,
         );
     }
@@ -119,78 +119,91 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
     }
 
     result.layers = [];
-    type TMask = NonNullable<Layer['mask']>;
-    const preparedMaskMap = new WeakMap<TMask, HTMLCanvasElement>();
-    function getPreparedMask(mask: TMask): HTMLCanvasElement {
-        const cached = preparedMaskMap.get(mask);
-        if (cached) {
-            return cached;
-        }
-        if (!mask.canvas) {
-            throw new Error('PSD mask canvas undefined');
-        }
+    function getPreparedMask(mask: NonNullable<Layer['mask']>, layer: Layer): HTMLCanvasElement {
         const canvas = createCanvas(result.width, result.height);
         const ctx = BB.ctx(canvas);
-        if ((mask.defaultColor ?? 255) !== 0) {
-            ctx.fillStyle = '#fff';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const defaultColor = mask.defaultColor ?? 255;
+        ctx.fillStyle = `rgb(${defaultColor}, ${defaultColor}, ${defaultColor})`;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+        const source = mask.canvas
+            ? BB.ctx(mask.canvas).getImageData(0, 0, mask.canvas.width, mask.canvas.height)
+            : mask.imageData;
+        if (source) {
+            const normalized = ctx.createImageData(source.width, source.height);
+            for (let i = 0; i < source.data.length; i += 4) {
+                const value = source.data[i];
+                normalized.data[i] = value;
+                normalized.data[i + 1] = value;
+                normalized.data[i + 2] = value;
+                normalized.data[i + 3] = 255;
+            }
+            ctx.putImageData(
+                normalized,
+                (mask.left ?? 0) + (mask.positionRelativeToLayer ? (layer.left ?? 0) : 0),
+                (mask.top ?? 0) + (mask.positionRelativeToLayer ? (layer.top ?? 0) : 0),
+            );
         }
-        const maskData = BB.ctx(mask.canvas).getImageData(
-            0,
-            0,
-            mask.canvas.width,
-            mask.canvas.height,
-        );
-        for (let i = 0; i < maskData.data.length; i += 4) {
-            const alpha = maskData.data[i];
-            maskData.data[i] = 255;
-            maskData.data[i + 1] = 255;
-            maskData.data[i + 2] = 255;
-            maskData.data[i + 3] = alpha;
-        }
-        ctx.putImageData(maskData, mask.left ?? 0, mask.top ?? 0);
-        preparedMaskMap.set(mask, canvas);
         return canvas;
     }
 
-    function applyMask(canvas: HTMLCanvasElement, mask: TMask): void {
-        if (mask.disabled) {
-            return;
-        }
-        const ctx = BB.ctx(canvas);
-        ctx.save();
-        ctx.globalCompositeOperation = 'destination-in';
-        ctx.drawImage(getPreparedMask(mask), 0, 0);
-        ctx.restore();
+    function getAdjustmentName(adjustment: NonNullable<Layer['adjustment']>, name: string): string {
+        const kindMap: Record<string, [string, string]> = {
+            'brightness/contrast': ['Brightness/Contrast', '明るさ・コントラスト'],
+            levels: ['Levels', 'レベル補正'],
+            curves: ['Curves', 'トーンカーブ'],
+            exposure: ['Exposure', '露光量'],
+            vibrance: ['Vibrance', '自然な彩度'],
+            'hue/saturation': ['Hue/Saturation', '色相・彩度'],
+            'color balance': ['Color Balance', 'カラーバランス'],
+            'black & white': ['Black & White', '白黒'],
+            'photo filter': ['Photo Filter', 'レンズフィルター'],
+            'channel mixer': ['Channel Mixer', 'チャンネルミキサー'],
+            'color lookup': ['Color Lookup', 'カラールックアップ'],
+            invert: ['Invert', '階調の反転'],
+            posterize: ['Posterize', 'ポスタリゼーション'],
+            threshold: ['Threshold', '2階調化'],
+            'gradient map': ['Gradient Map', 'グラデーションマップ'],
+            'selective color': ['Selective Color', '特定色域の選択'],
+        };
+        const isJapanese = LANGUAGE_STRINGS.getCode() === 'ja';
+        const kind = kindMap[adjustment.type]?.[isJapanese ? 1 : 0] ?? adjustment.type;
+        return isJapanese ? `[調整: ${kind}] ${name}` : `[Adjustment: ${kind}] ${name}`;
     }
 
     // ag-psd stores siblings bottom-to-top. Postorder keeps each folder after its children.
-    function convertChildren(
-        children: Layer[],
-        parentGroupId: string | null,
-        ancestorMasks: TMask[],
-    ): void {
+    function convertChildren(children: Layer[], parentGroupId: string | null): void {
         for (const item of children) {
-            if (item.adjustment) {
-                addWarning('adjustment');
-                continue;
-            }
             if (item.effects) {
                 addWarning('layer-effect');
             }
-            if (item.mask || item.vectorMask) {
+            if (item.vectorMask || item.realMask || item.mask?.fromVectorData ||
+                item.mask?.userMaskDensity !== undefined || item.mask?.userMaskFeather !== undefined ||
+                item.mask?.vectorMaskDensity !== undefined || item.mask?.vectorMaskFeather !== undefined) {
                 addWarning('mask');
+            }
+            const mask = item.mask
+                ? { image: getPreparedMask(item.mask, item), enabled: !item.mask.disabled }
+                : undefined;
+
+            if (item.adjustment) {
+                addWarning('adjustment');
+                result.layers!.push({
+                    name: getAdjustmentName(item.adjustment, item.name ?? ''),
+                    isVisible: !item.hidden,
+                    opacity: 1,
+                    mixModeStr: 'source-over',
+                    // A transparent placeholder must not become the base of a clipping stack.
+                    hasClipping: true,
+                    parentGroupId,
+                    image: createCanvas(result.width, result.height),
+                    mask,
+                });
+                continue;
             }
 
             if (item.children) {
                 const groupId = randomUuid();
-                convertChildren(
-                    item.children,
-                    groupId,
-                    item.mask && !item.mask.disabled
-                        ? [...ancestorMasks, item.mask]
-                        : ancestorMasks,
-                );
+                convertChildren(item.children, groupId);
                 result.layers!.push({
                     name: item.name ?? '',
                     isVisible: !item.hidden,
@@ -205,6 +218,7 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
                     isExpanded: item.opened !== false,
                     isPassThrough: item.blendMode === 'pass through',
                     image: createCanvas(1, 1),
+                    mask,
                 });
                 continue;
             }
@@ -212,12 +226,6 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
             const canvas = createCanvas(result.width, result.height);
             if (item.canvas) {
                 BB.ctx(canvas).drawImage(item.canvas, item.left ?? 0, item.top ?? 0);
-            }
-            if (item.mask) {
-                applyMask(canvas, item.mask);
-            }
-            for (const mask of ancestorMasks) {
-                applyMask(canvas, mask);
             }
             result.layers!.push({
                 name: item.name ?? '',
@@ -227,11 +235,12 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
                 hasClipping: !!item.clipping,
                 parentGroupId,
                 image: canvas,
+                mask,
             });
         }
     }
 
-    convertChildren(psdObj.children ?? [], null, []);
+    convertChildren(psdObj.children ?? [], null);
 
     return result;
 }
@@ -258,6 +267,7 @@ export function klPsdToKlProject(klPsd: TKlPsd): TKlProject {
                 isExpanded: item.isExpanded,
                 isPassThrough: item.isPassThrough,
                 image: item.image,
+                mask: item.mask,
             };
         });
     } else {

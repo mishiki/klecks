@@ -25,27 +25,27 @@ export function validateHistoryEntry(
     const layerEntries = Object.entries(entryData.layerMap ?? {});
     for (let layerIndex = 0; layerIndex < layerEntries.length; layerIndex++) {
         const [layerId, layer] = layerEntries[layerIndex];
-        if (layer.tiles === undefined) {
-            continue;
-        }
-        if (layer.tiles.length !== expectedTileCount) {
-            const err = `[KlHistory] Invalid tile count for layer "${layerId}": expected ${expectedTileCount}, got ${layer.tiles.length}`;
-            asyncThrow(new Error(err));
-            // one error is enough
-            return;
-        }
-
-        for (let tileIndex = 0; tileIndex < layer.tiles.length; tileIndex++) {
-            const tile = layer.tiles[tileIndex];
-            if (tile === undefined || isLayerFill(tile)) {
+        for (const [kind, tiles] of [['layer', layer.tiles], ['mask', layer.mask?.tiles]] as const) {
+            if (tiles === undefined) {
                 continue;
             }
-            const tileSize = getTileSizeFromIndex(tileIndex, size);
-            if (tile.data.width !== tileSize.width || tile.data.height !== tileSize.height) {
-                const err = `[KlHistory] Invalid tile dimensions for layer "${layerId}" at index ${tileIndex}: expected ${tileSize.width}x${tileSize.height}, got ${tile.data.width}x${tile.data.height}`;
+            if (tiles.length !== expectedTileCount) {
+                const err = `[KlHistory] Invalid tile count for ${kind} "${layerId}": expected ${expectedTileCount}, got ${tiles.length}`;
                 asyncThrow(new Error(err));
-                // one error is enough
                 return;
+            }
+
+            for (let tileIndex = 0; tileIndex < tiles.length; tileIndex++) {
+                const tile = tiles[tileIndex];
+                if (tile === undefined || isLayerFill(tile)) {
+                    continue;
+                }
+                const tileSize = getTileSizeFromIndex(tileIndex, size);
+                if (tile.data.width !== tileSize.width || tile.data.height !== tileSize.height) {
+                    const err = `[KlHistory] Invalid tile dimensions for ${kind} "${layerId}" at index ${tileIndex}: expected ${tileSize.width}x${tileSize.height}, got ${tile.data.width}x${tile.data.height}`;
+                    asyncThrow(new Error(err));
+                    return;
+                }
             }
         }
     }

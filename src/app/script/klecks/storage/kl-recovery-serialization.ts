@@ -20,9 +20,10 @@ type TImageDataRead = TIdb['V2']['ImageDataStore']['Read'];
 export function getRecoveryImageDataIds(recovery: TIdb['V2']['RecoveryStore']['Read']): string[] {
     return [
         recovery.thumbnail,
-        ...recovery.layers.flatMap((layer) =>
-            layer.image.flatMap((tile) => (isLayerFill(tile) ? [] : [tile.id])),
-        ),
+        ...recovery.layers.flatMap((layer) => [
+            ...layer.image.flatMap((tile) => (isLayerFill(tile) ? [] : [tile.id])),
+            ...(layer.mask?.image.flatMap((tile) => (isLayerFill(tile) ? [] : [tile.id])) ?? []),
+        ]),
     ];
 }
 
@@ -52,18 +53,21 @@ export function serializeRecovery(
     let memoryEstimateBytes = getImageDataBytes(thumbnail.data);
     const sortedComposedLayers = Object.values(composed.layerMap).sort(sortLayerMap);
     for (const composedLayer of sortedComposedLayers) {
-        const image: TIdb['V2']['RecoveryStore']['Write']['layers'][number]['image'] = [];
-        for (const tile of composedLayer.tiles) {
-            if (isLayerFill(tile)) {
-                memoryEstimateBytes += getFillBytes(tile.fill);
-                image.push(tile);
-            } else {
-                imageDataEntries.push({ key: tile.id, value: tile.data });
-                const size = getImageDataBytes(tile.data);
-                memoryEstimateBytes += size;
-                image.push({ id: tile.id, sizeBytes: size });
+        const serializeTiles = (tiles: THistoryEntryLayerTile[]) => {
+            const image: TIdb['V2']['RecoveryStore']['Write']['layers'][number]['image'] = [];
+            for (const tile of tiles) {
+                if (isLayerFill(tile)) {
+                    memoryEstimateBytes += getFillBytes(tile.fill);
+                    image.push(tile);
+                } else {
+                    imageDataEntries.push({ key: tile.id, value: tile.data });
+                    const size = getImageDataBytes(tile.data);
+                    memoryEstimateBytes += size;
+                    image.push({ id: tile.id, sizeBytes: size });
+                }
             }
-        }
+            return image;
+        };
         layers.push({
             name: composedLayer.name,
             isVisible: composedLayer.isVisible,
@@ -74,7 +78,13 @@ export function serializeRecovery(
             parentGroupId: composedLayer.parentGroupId,
             isExpanded: composedLayer.isExpanded,
             isPassThrough: composedLayer.isPassThrough,
-            image,
+            image: serializeTiles(composedLayer.tiles),
+            mask: composedLayer.mask
+                ? {
+                      enabled: composedLayer.mask.enabled,
+                      image: serializeTiles(composedLayer.mask.tiles),
+                  }
+                : undefined,
         });
     }
 
@@ -167,22 +177,27 @@ export async function deserializeRecovery(
     const layers: TKlProjectLayer[] = [];
 
     for (const layer of readResult.recovery.layers) {
-        const deserializedTiles: THistoryEntryLayerTile[] = [];
-        for (const [tileIndex, tile] of layer.image.entries()) {
-            throwIfAborted(signal);
-            if (isLayerFill(tile)) {
-                deserializedTiles.push(tile);
-            } else {
-                deserializedTiles.push(
-                    await deserializeImageDataTile(
-                        tile.id,
-                        readResult.imageDataById.get(tile.id),
-                        ctx,
-                        getTileSizeFromIndex(tileIndex, readResult.recovery),
-                    ),
-                );
+        const deserializeTiles = async (
+            tiles: typeof layer.image,
+        ): Promise<THistoryEntryLayerTile[]> => {
+            const deserializedTiles: THistoryEntryLayerTile[] = [];
+            for (const [tileIndex, tile] of tiles.entries()) {
+                throwIfAborted(signal);
+                if (isLayerFill(tile)) {
+                    deserializedTiles.push(tile);
+                } else {
+                    deserializedTiles.push(
+                        await deserializeImageDataTile(
+                            tile.id,
+                            readResult.imageDataById.get(tile.id),
+                            ctx,
+                            getTileSizeFromIndex(tileIndex, readResult.recovery),
+                        ),
+                    );
+                }
             }
-        }
+            return deserializedTiles;
+        };
         layers.push({
             ...layer,
             mixModeStr: getMixModeStr(layer.mixModeStr),
@@ -190,7 +205,10 @@ export async function deserializeRecovery(
             parentGroupId: layer.parentGroupId ?? null,
             isExpanded: layer.isExpanded ?? true,
             isPassThrough: layer.isPassThrough ?? false,
-            image: deserializedTiles,
+            image: await deserializeTiles(layer.image),
+            mask: layer.mask
+                ? { enabled: layer.mask.enabled, image: await deserializeTiles(layer.mask.image) }
+                : undefined,
         });
     }
 

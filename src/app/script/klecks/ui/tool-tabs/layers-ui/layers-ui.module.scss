@@ -19,6 +19,35 @@
     font-weight: 600;
 }
 
+.targetThumbnail {
+    display: block;
+    box-sizing: border-box;
+    padding: 0;
+    border: 1px solid transparent;
+    border-radius: 2px;
+    background: transparent;
+    cursor: pointer;
+}
+
+.activeTarget {
+    border: 2px solid var(--active-highlight-color);
+}
+
+.disabledMask {
+    opacity: 0.45;
+}
+
+.disabledMask::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 0;
+    width: 100%;
+    border-top: 2px solid currentColor;
+    transform: rotate(-40deg);
+    pointer-events: none;
+}
+
 .addGroupIcon {
     display: flex;
     align-items: center;

@@ -52,6 +52,22 @@ function composeLayerTiles(
     return result as THistoryEntryLayerTile[];
 }
 
+function composeLayerMask(
+    layerEntries: (THistoryEntryLayer | undefined)[],
+): THistoryEntryLayerComposed['mask'] {
+    const masks = layerEntries.map((entry) => entry?.mask);
+    const lastClearIndex = masks.findLastIndex((mask) => mask === null);
+    const activeMasks = masks.slice(lastClearIndex + 1);
+    if (!activeMasks.some((mask) => mask !== undefined && mask !== null)) {
+        return null;
+    }
+    const maskEntries = activeMasks.filter((mask) => mask !== undefined && mask !== null);
+    return {
+        enabled: getLatestDefinedProp(maskEntries, 'enabled', true as boolean),
+        tiles: composeLayerTiles(maskEntries.map((mask) => mask.tiles)),
+    };
+}
+
 // combines layers from multiple history entries into the latest representation
 function composeLayer(
     layerEntries: (THistoryEntryLayer | undefined)[],
@@ -68,6 +84,7 @@ function composeLayer(
         isPassThrough: getLatestDefinedProp(layerEntries, 'isPassThrough', false as boolean),
         index: getLatestDefinedProp(layerEntries, 'index'),
         tiles: composeLayerTiles(layerEntries.map((item) => (item ? item.tiles : undefined))),
+        mask: composeLayerMask(layerEntries),
     };
 }
 

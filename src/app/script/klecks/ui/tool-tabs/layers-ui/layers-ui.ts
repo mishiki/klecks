@@ -25,11 +25,14 @@ const paddingLeft = 25;
 const layerHeight = 35;
 type TBlendChoice = TMixMode | 'pass-through';
 type TDropPlacement = 'above' | 'below' | 'inside';
+export type TLayerEditTarget = 'image' | 'mask';
 
 type TLayerEl = HTMLElement & {
     label: HTMLElement;
     opacityLabel: HTMLElement;
     thumb?: HTMLCanvasElement;
+    imageTarget?: HTMLElement;
+    maskTarget?: HTMLElement;
 
     spot: number;
     layerName: string;
@@ -41,7 +44,7 @@ type TLayerEl = HTMLElement & {
 
 export type TLayersUiParams = {
     klCanvas: KlCanvas;
-    onSelect: (layerIndex: number, pushHistory: boolean) => void;
+    onSelect: (layerIndex: number, pushHistory: boolean, target: TLayerEditTarget) => void;
     parentEl: HTMLElement;
     floatingLayerPreview: FloatingLayerPreview;
     applyUncommitted: () => void;
@@ -53,7 +56,7 @@ export type TLayersUiParams = {
 export class LayersUi {
     // from params
     private klCanvas: KlCanvas;
-    private readonly onSelect: (layerIndex: number, pushHistory: boolean) => void;
+    private readonly onSelect: (layerIndex: number, pushHistory: boolean, target: TLayerEditTarget) => void;
     private readonly parentEl: HTMLElement;
     private readonly floatingLayerPreview: FloatingLayerPreview;
     private readonly applyUncommitted: () => void;
@@ -73,12 +76,22 @@ export class LayersUi {
     private readonly addGroupBtn: HTMLButtonElement;
     private readonly duplicateBtn: HTMLButtonElement;
     private readonly mergeBtn: HTMLButtonElement;
-    private readonly moreDropdown: DropdownMenu<'clear-layer' | 'advanced-merge' | 'merge-all'>;
+    private readonly moreDropdown: DropdownMenu<
+        | 'clear-layer'
+        | 'advanced-merge'
+        | 'merge-all'
+        | 'add-mask'
+        | 'remove-mask'
+        | 'toggle-mask'
+        | 'invert-mask'
+        | 'clear-mask'
+    >;
     private readonly modeSelect: SelectCustom<TBlendChoice>;
     private modeSelectIsGroup: boolean = false;
     private readonly clippingToggle: BoxToggle;
     private readonly backgroundOptions: Options<TCanvasBackground>;
     private oldHistoryState: number | undefined;
+    private selectedTarget: TLayerEditTarget = 'image';
     private isManipulating: boolean = false;
     private isMutatingStructure: boolean = false;
 
@@ -158,9 +171,10 @@ export class LayersUi {
 
     private selectAfterStructure(newIndex: number): void {
         this.selectedSpotIndex = newIndex;
+        this.selectedTarget = 'image';
         this.klCanvasLayerArr = this.klCanvas.getLayers();
         this.createLayerList(true);
-        this.onSelect(newIndex, false);
+        this.onSelect(newIndex, false, 'image');
     }
 
     private getDropTarget(clientY: number): { index: number; placement: TDropPlacement } | undefined {
@@ -207,8 +221,15 @@ export class LayersUi {
             }
             this.klCanvas.renameLayer(layerSpot, newName);
             //this.createLayerList();
-            this.onSelect(layerSpot, false);
+            this.onSelect(layerSpot, false, this.selectedTarget);
         });
+    }
+
+    private selectTarget(index: number, target: TLayerEditTarget): void {
+        this.applyUncommitted();
+        const changedLayer = this.selectedSpotIndex !== index;
+        this.activateLayer(index, target);
+        this.onSelect(index, changedLayer, target);
     }
 
     private updateHeight(): void {
@@ -236,8 +257,10 @@ export class LayersUi {
             const opacity = klLayer.opacity;
             const isVisible = klLayer.isVisible;
             const layercanvas = klLayer.context.canvas;
+            const maskcanvas = klLayer.mask?.context.canvas;
             const hasClipping = klLayer.hasClipping;
             const clippingOffset = hasClipping ? 15 : 0;
+            const maskOffset = maskcanvas ? 29 : 0;
             const isGroup = !!klLayer.groupId;
             const indent = Math.min(84, this.getDepth(index) * 14);
             const contentLeft = paddingLeft + indent + (isGroup ? 18 : 0);
@@ -308,7 +331,7 @@ export class LayersUi {
                     this.klCanvasLayerArr = this.klCanvas.getLayers();
                     this.createLayerList(true);
                     if (selectGroup) {
-                        this.onSelect(index, false);
+                        this.onSelect(index, false, this.selectedTarget);
                     }
                 };
             }
@@ -347,7 +370,7 @@ export class LayersUi {
                 check.onchange = () => {
                     this.klCanvas.setLayerIsVisible(layer.spot, check.checked);
                     if (layer.spot === this.selectedSpotIndex) {
-                        this.onSelect(this.selectedSpotIndex, false);
+                        this.onSelect(this.selectedSpotIndex, false, this.selectedTarget);
                     }
                 };
                 // prevent layer getting dragged
@@ -362,17 +385,39 @@ export class LayersUi {
                 }
             }
 
+            // The image and its mask are independent paint targets.
+            layer.imageTarget = BB.el({
+                tagName: 'button',
+                parent: container1,
+                className: classes.targetThumbnail,
+                title: LANG('layers-image-target'),
+                props: { type: 'button', ariaLabel: LANG('layers-image-target'), tabIndex: -1 },
+                css: {
+                    position: 'absolute',
+                    left: contentLeft,
+                    top: 1,
+                    width: 32,
+                    height: 32,
+                },
+            });
+            layer.imageTarget.onpointerdown = (event) => event.stopPropagation();
+            layer.imageTarget.onmousedown = (event) => event.stopPropagation();
+            layer.imageTarget.onclick = (event) => {
+                event.stopPropagation();
+                this.selectTarget(index, 'image');
+            };
+
             //thumb or folder glyph
             if (isGroup) {
-                container1.append(
+                layer.imageTarget.append(
                     BB.el({
                         tagName: 'span',
                         textContent: '📁',
                         props: { ariaHidden: 'true' },
                         css: {
                             position: 'absolute',
-                            left: contentLeft + 3,
-                            top: 5,
+                            left: 3,
+                            top: 3,
                             fontSize: 20,
                             lineHeight: '24px',
                             pointerEvents: 'none',
@@ -399,17 +444,51 @@ export class LayersUi {
                 thc.restore();
                 css(layer.thumb, {
                     position: 'absolute',
-                    left: (32 - layer.thumb.width) / 2 + contentLeft,
-                    top: (32 - layer.thumb.height) / 2 + 1,
+                    left: (32 - layer.thumb.width) / 2,
+                    top: (32 - layer.thumb.height) / 2,
                     background: 'var(--kl-checkerboard-background)',
                 });
+            }
+
+            if (maskcanvas) {
+                const maskThumb = BB.canvas(24, 24);
+                BB.ctx(maskThumb).drawImage(maskcanvas, 0, 0, 24, 24);
+                layer.maskTarget = BB.el({
+                    tagName: 'button',
+                    parent: container1,
+                    className: classes.targetThumbnail,
+                    title: klLayer.mask!.enabled
+                        ? LANG('layers-mask-target')
+                        : LANG('layers-mask-disabled'),
+                    props: { type: 'button', ariaLabel: LANG('layers-mask-target'), tabIndex: -1 },
+                    css: {
+                        position: 'absolute',
+                        left: contentLeft + 34,
+                        top: 4,
+                        width: 26,
+                        height: 26,
+                    },
+                });
+                if (!klLayer.mask!.enabled) {
+                    layer.maskTarget.classList.add(classes.disabledMask);
+                }
+                maskThumb.style.width = '24px';
+                maskThumb.style.height = '24px';
+                maskThumb.style.display = 'block';
+                layer.maskTarget.append(maskThumb);
+                layer.maskTarget.onpointerdown = (event) => event.stopPropagation();
+                layer.maskTarget.onmousedown = (event) => event.stopPropagation();
+                layer.maskTarget.onclick = (event) => {
+                    event.stopPropagation();
+                    this.selectTarget(index, 'mask');
+                };
             }
 
             //clipping indicator
             const clippingIcon = hasClipping
                 ? getIconSvg('layer-clipping', {
                       position: 'absolute',
-                      left: contentLeft + 32,
+                      left: contentLeft + 32 + maskOffset,
                       top: 9,
                       width: 16,
                       height: 16,
@@ -428,10 +507,10 @@ export class LayersUi {
 
                 css(layer.label, {
                     position: 'absolute',
-                    left: 1 + 32 + 5 + contentLeft + clippingOffset,
+                    left: 1 + 32 + 5 + contentLeft + clippingOffset + maskOffset,
                     top: 1,
                     fontSize: 13,
-                    width: Math.max(40, 165 - (contentLeft - paddingLeft) - clippingOffset),
+                    width: Math.max(25, 165 - (contentLeft - paddingLeft) - clippingOffset - maskOffset),
                     height: 20,
                     overflow: 'hidden',
                     whiteSpace: 'nowrap',
@@ -466,7 +545,7 @@ export class LayersUi {
             let oldOpacity: number;
             const opacitySlider = new PointSlider({
                 init: layer.opacity,
-                width: Math.max(90, 200 - (contentLeft - paddingLeft) - clippingOffset),
+                width: Math.max(60, 200 - (contentLeft - paddingLeft) - clippingOffset - maskOffset),
                 pointSize: 14,
                 callback: (sliderValue, isFirst, isLast) => {
                     if (isFirst) {
@@ -494,7 +573,7 @@ export class LayersUi {
             });
             css(opacitySlider.getElement(), {
                 position: 'absolute',
-                left: 39 + contentLeft + clippingOffset,
+                left: 39 + contentLeft + clippingOffset + maskOffset,
                 top: 17,
             });
             layer.opacitySlider = opacitySlider;
@@ -545,7 +624,7 @@ export class LayersUi {
             }
 
             if (layer.thumb) {
-                container1.append(layer.thumb);
+                layer.imageTarget.append(layer.thumb);
             }
             if (clippingIcon) {
                 container1.append(clippingIcon);
@@ -564,9 +643,9 @@ export class LayersUi {
                     !this.isManipulating
                 ) {
                     freshSelection = false;
-                    if (!layer.isSelected) {
+                    if (!layer.isSelected || this.selectedTarget !== 'image') {
                         freshSelection = true;
-                        this.activateLayer(layer.spot);
+                        this.activateLayer(layer.spot, 'image');
                     }
                     isDragging = true;
                     hasMoved = false;
@@ -612,11 +691,11 @@ export class LayersUi {
                         if (typeof newIndex === 'number') {
                             this.selectAfterStructure(newIndex);
                         } else if (freshSelection) {
-                            this.onSelect(layer.spot, true);
+                            this.onSelect(layer.spot, true, this.selectedTarget);
                         }
                     } else if (freshSelection) {
                         this.applyUncommitted();
-                        this.onSelect(layer.spot, true);
+                        this.onSelect(layer.spot, true, this.selectedTarget);
                     }
                     freshSelection = false;
                     dropTarget = undefined;
@@ -653,7 +732,7 @@ export class LayersUi {
         this.activateLayer(this.selectedSpotIndex);
         this.updateHeight();
         if (previousSelection !== this.selectedSpotIndex) {
-            this.onSelect(this.selectedSpotIndex, false);
+            this.onSelect(this.selectedSpotIndex, false, this.selectedTarget);
         }
     }
 
@@ -670,9 +749,14 @@ export class LayersUi {
         this.removeBtn.disabled = oneLayer || (!isGroup && rasterCount <= 1);
         this.duplicateBtn.disabled = maxReached;
         this.mergeBtn.disabled = !canMerge;
-        this.moreDropdown.setEnabled('clear-layer', !isGroup);
+        this.moreDropdown.setEnabled('clear-layer', !isGroup && this.selectedTarget === 'image');
         this.moreDropdown.setEnabled('advanced-merge', canMerge);
-        this.moreDropdown.setEnabled('merge-all', !oneLayer);
+        this.moreDropdown.setEnabled('merge-all', !oneLayer || !!selected?.mask);
+        this.moreDropdown.setEnabled('add-mask', !!selected && !selected.mask);
+        this.moreDropdown.setEnabled('remove-mask', !!selected?.mask);
+        this.moreDropdown.setEnabled('toggle-mask', !!selected?.mask);
+        this.moreDropdown.setEnabled('invert-mask', !!selected?.mask);
+        this.moreDropdown.setEnabled('clear-mask', !!selected?.mask);
     }
 
     private canMergeSelected(): boolean {
@@ -683,6 +767,8 @@ export class LayersUi {
             !!below &&
             !selected.groupId &&
             !below.groupId &&
+            !selected.mask &&
+            !below.mask &&
             (selected.parentGroupId ?? null) === (below.parentGroupId ?? null)
         );
     }
@@ -844,14 +930,75 @@ export class LayersUi {
             buttonTitle: LANG('more'),
             items: [
                 ['clear-layer', LANG('layers-clear'), '⌫'],
+                ['add-mask', LANG('layers-mask-add')],
+                ['remove-mask', LANG('layers-mask-remove')],
+                ['toggle-mask', LANG('layers-mask-toggle')],
+                ['invert-mask', LANG('layers-mask-invert')],
+                ['clear-mask', LANG('layers-mask-clear')],
                 ['advanced-merge', LANG('layers-merge-advanced'), 'Ctrl + Shift + E'],
                 ['merge-all', LANG('layers-merge-all')],
             ],
             onItemClick: (id) => {
                 if (id === 'clear-layer') {
-                    if (!this.klCanvasLayerArr[this.selectedSpotIndex]?.groupId) {
+                    if (
+                        this.selectedTarget === 'image' &&
+                        !this.klCanvasLayerArr[this.selectedSpotIndex]?.groupId
+                    ) {
                         this.onClearLayer();
                     }
+                }
+                if (id === 'add-mask') {
+                    this.applyUncommitted();
+                    if (!this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
+                        this.klCanvas.addLayerMask(this.selectedSpotIndex);
+                        this.selectedTarget = 'mask';
+                        this.onSelect(this.selectedSpotIndex, false, 'mask');
+                    }
+                }
+                if (id === 'remove-mask') {
+                    this.applyUncommitted();
+                    if (this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
+                        this.klCanvas.removeLayerMask(this.selectedSpotIndex);
+                        this.selectedTarget = 'image';
+                        this.onSelect(this.selectedSpotIndex, false, 'image');
+                    }
+                }
+                if (id === 'toggle-mask') {
+                    this.applyUncommitted();
+                    const mask = this.klCanvas.getLayer(this.selectedSpotIndex).mask;
+                    if (mask) {
+                        this.klCanvas.setLayerMaskEnabled(this.selectedSpotIndex, !mask.enabled);
+                    }
+                }
+                if (id === 'invert-mask') {
+                    this.applyUncommitted();
+                    if (this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
+                        this.klCanvas.invertLayerMask(this.selectedSpotIndex);
+                    }
+                }
+                if (id === 'clear-mask') {
+                    this.applyUncommitted();
+                    const context = this.klCanvas.getLayerMaskContext(this.selectedSpotIndex);
+                    if (context) {
+                        context.save();
+                        context.globalCompositeOperation = 'source-over';
+                        context.fillStyle = '#fff';
+                        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+                        context.restore();
+                        this.klCanvas.markLayerMaskChanged(this.selectedSpotIndex);
+                        this.klCanvas.pushLayerMaskHistory(this.selectedSpotIndex);
+                    }
+                }
+                if (
+                    id === 'add-mask' ||
+                    id === 'remove-mask' ||
+                    id === 'toggle-mask' ||
+                    id === 'invert-mask' ||
+                    id === 'clear-mask'
+                ) {
+                    this.update(this.selectedSpotIndex);
+                    this.createLayerList(true);
+                    this.onUpdateProject();
                 }
                 if (id === 'advanced-merge') {
                     if (this.canMergeSelected()) {
@@ -1043,7 +1190,13 @@ export class LayersUi {
         this.backgroundOptions.setValue(this.klCanvas.getBackground(), true);
         this.klCanvasLayerArr = this.klCanvas.getLayers();
         if (activeLayerSpotIndex || activeLayerSpotIndex === 0) {
+            if (this.selectedSpotIndex !== activeLayerSpotIndex) {
+                this.selectedTarget = 'image';
+            }
             this.selectedSpotIndex = activeLayerSpotIndex;
+        }
+        if (!this.klCanvasLayerArr[this.selectedSpotIndex]?.mask) {
+            this.selectedTarget = 'image';
         }
         this.updateButtons();
         if (this.isVisible) {
@@ -1056,7 +1209,11 @@ export class LayersUi {
         return this.selectedSpotIndex;
     }
 
-    activateLayer(spotIndex: number): void {
+    getSelectedTarget(): TLayerEditTarget {
+        return this.selectedTarget;
+    }
+
+    activateLayer(spotIndex: number, target: TLayerEditTarget = this.selectedTarget): void {
         if (spotIndex < 0 || spotIndex > this.layerElArr.length - 1) {
             throw (
                 'invalid spotIndex ' + spotIndex + ', layerElArr.length ' + this.layerElArr.length
@@ -1064,6 +1221,7 @@ export class LayersUi {
         }
         this.selectedSpotIndex = spotIndex;
         const selected = this.klCanvasLayerArr[this.selectedSpotIndex];
+        this.selectedTarget = target === 'mask' && selected.mask ? 'mask' : 'image';
         const isGroup = !!selected.groupId;
         if (this.modeSelectIsGroup !== isGroup) {
             this.modeSelect.setOptionArr(this.getBlendOptions(isGroup));
@@ -1084,6 +1242,14 @@ export class LayersUi {
                 boxShadow: '',
             });
             layer.classList.toggle('kl-layer--selected', isSelected);
+            layer.imageTarget?.classList.toggle(
+                classes.activeTarget,
+                isSelected && this.selectedTarget === 'image',
+            );
+            layer.maskTarget?.classList.toggle(
+                classes.activeTarget,
+                isSelected && this.selectedTarget === 'mask',
+            );
             layer.opacitySlider.setActive(isSelected);
             layer.isSelected = isSelected;
         }

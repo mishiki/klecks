@@ -50,6 +50,39 @@ export function projectToComposed(project: TKlProject): THistoryEntryDataCompose
                 tiles = canvasToLayerTiles(canvas);
             }
 
+            let mask: { enabled: boolean; tiles: THistoryEntryLayerTile[] } | null = null;
+            if (layer.mask) {
+                const maskImage = layer.mask.image;
+                let maskTiles: THistoryEntryLayerTile[];
+                if (maskImage instanceof Array) {
+                    maskTiles = [...maskImage];
+                } else if (isLayerFill(maskImage)) {
+                    maskTiles = createFillColorTiles(project.width, project.height, maskImage.fill);
+                } else {
+                    const maskCanvas = BB.canvas(project.width, project.height);
+                    const maskContext = BB.ctx(maskCanvas);
+                    maskContext.fillStyle = 'white';
+                    maskContext.fillRect(0, 0, project.width, project.height);
+                    maskContext.drawImage(maskImage, 0, 0);
+                    const data = maskContext.getImageData(0, 0, project.width, project.height);
+                    for (let i = 0; i < data.data.length; i += 4) {
+                        const gray = Math.round(
+                            data.data[i] * 0.2126 +
+                            data.data[i + 1] * 0.7152 +
+                            data.data[i + 2] * 0.0722,
+                        );
+                        data.data[i] = gray;
+                        data.data[i + 1] = gray;
+                        data.data[i + 2] = gray;
+                        data.data[i + 3] = 255;
+                    }
+                    maskContext.putImageData(data, 0, 0);
+                    maskTiles = canvasToLayerTiles(maskCanvas);
+                    BB.freeCanvas(maskCanvas);
+                }
+                mask = { enabled: layer.mask.enabled, tiles: maskTiles };
+            }
+
             return [
                 lastId,
                 {
@@ -64,6 +97,7 @@ export function projectToComposed(project: TKlProject): THistoryEntryDataCompose
                     isPassThrough: layer.isPassThrough ?? false,
                     index,
                     tiles,
+                    mask,
                 },
             ];
         }),

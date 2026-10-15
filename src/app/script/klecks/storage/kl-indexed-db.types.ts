@@ -130,6 +130,13 @@ export type TIdb = {
                     blob:
                         | TIdb['V2']['Common']['PngBlob']
                         | TIdb['V2']['ProjectStore']['ImageDataRef'];
+                    mask?: {
+                        blob:
+                            | TIdb['V2']['Common']['PngBlob']
+                            | TIdb['V2']['ProjectStore']['ImageDataRef'];
+                        enabled?: boolean;
+                        revision?: number;
+                    };
                 }[];
             };
             Write: {
@@ -154,6 +161,11 @@ export type TIdb = {
                     isExpanded?: boolean;
                     isPassThrough?: boolean;
                     blob: TIdb['V2']['ProjectStore']['ImageDataRef'];
+                    mask?: {
+                        blob: TIdb['V2']['ProjectStore']['ImageDataRef'];
+                        enabled: boolean;
+                        revision?: number;
+                    };
                 }[];
             };
         };
@@ -197,6 +209,13 @@ export type TIdb = {
                         | TIdb['V2']['RecoveryStore']['ImageDataRef']
                         | TIdb['V2']['RecoveryStore']['LayerFill']
                     )[];
+                    mask?: {
+                        enabled: boolean;
+                        image: (
+                            | TIdb['V2']['RecoveryStore']['ImageDataRef']
+                            | TIdb['V2']['RecoveryStore']['LayerFill']
+                        )[];
+                    };
                 }[];
                 memoryEstimateBytes: number;
             };
@@ -227,6 +246,13 @@ export type TIdb = {
                         | TIdb['V2']['RecoveryStore']['ImageDataRef']
                         | TIdb['V2']['RecoveryStore']['LayerFill']
                     )[];
+                    mask?: {
+                        enabled: boolean;
+                        image: (
+                            | TIdb['V2']['RecoveryStore']['ImageDataRef']
+                            | TIdb['V2']['RecoveryStore']['LayerFill']
+                        )[];
+                    };
                 }[];
                 memoryEstimateBytes: number;
             };

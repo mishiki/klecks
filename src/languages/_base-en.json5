@@ -259,6 +259,17 @@ Renaming a key across multiple language files:
   },
   "layers-merge-advanced": 'Advanced merge',
   "layers-merge-all": 'Merge all',
+  "layers-image-target": "Edit layer pixels",
+  "layers-mask-target": "Edit layer mask",
+  "layers-mask-disabled": "Layer mask disabled (click to edit)",
+  "layers-mask-add": "Add layer mask",
+  "layers-mask-remove": "Remove layer mask",
+  "layers-mask-toggle": "Enable / disable layer mask",
+  "layers-mask-invert": "Invert layer mask",
+  "layers-mask-clear": "Fill layer mask with white",
+  "layers-mask-paint": "Mask: black hides, white reveals",
+  "layers-mask-black": "Hide (black)",
+  "layers-mask-white": "Reveal (white)",
   "layers-rename": {
     "hint": "action",
     "value": "Rename"
@@ -861,6 +872,8 @@ Renaming a key across multiple language files:
   },
   "import-psd-too-large": "Image exceeds maximum dimensions of {x} x {x} pixels. Unable to import.",
   "import-psd-size": "Image size",
+  "import-mask-effects-unsupported": "Vector masks and mask effects are not fully supported. Raster masks remain editable.",
+  "import-adjustment-placeholder": "Adjustment effects are not reproduced. Layer names and types are retained as transparent layers.",
   "clipboard-read-fail": "Failed to read from clipboard.",
   "clipboard-no-image": "No image found in clipboard.",
 

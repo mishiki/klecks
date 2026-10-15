@@ -4,8 +4,9 @@ import { ctx, freeCanvas } from '../../bb/base/canvas';
 import { changeCanvasDimensions } from '../../bb/base/change-canvas-dimensions';
 import type { TKlLayer } from '../kl-types';
 import { getClippingGroups } from './get-clipping-groups';
+import { MaskAlphaCache, TRenderMask } from './mask-alpha-cache';
 
-type TCompositeLayer = Omit<TKlLayer<unknown>, 'image'>;
+type TCompositeLayer = Omit<TKlLayer<unknown>, 'image' | 'mask'> & { mask?: TRenderMask | null };
 type TDrawLayer<L> = (target: CanvasRenderingContext2D, layer: L) => void;
 type TNode<L> = { layer: L; children: TNode<L>[]; hasClipping: boolean };
 
@@ -13,6 +14,7 @@ type TNode<L> = { layer: L; children: TNode<L>[]; hasClipping: boolean };
 export class LayerCompositor {
     private canvases: HTMLCanvasElement[] = [];
     private depth = 0;
+    private maskCache = new MaskAlphaCache();
 
     private surface<T>(width: number, height: number, use: (canvas: HTMLCanvasElement) => T): T {
         const index = this.depth++;
@@ -32,6 +34,7 @@ export class LayerCompositor {
         height: number,
         drawLayer: TDrawLayer<L>,
     ): void {
+        this.maskCache.retain(layers.map((layer) => layer.mask));
         const nodes: TNode<L>[] = layers.map((layer) => ({ layer, children: [], hasClipping: layer.hasClipping }));
         const folders = new Map<string, TNode<L>>();
         nodes.forEach((node) => { if (node.layer.groupId) folders.set(node.layer.groupId, node); });
@@ -57,6 +60,10 @@ export class LayerCompositor {
                 } finally {
                     context.restore();
                 }
+                if (node.layer.mask?.enabled) {
+                    drawBlended(context, 'destination-in', 1, (out) =>
+                        out.drawImage(this.maskCache.get(node.layer.mask!, width, height), 0, 0));
+                }
                 use(image);
             });
         };
@@ -64,14 +71,14 @@ export class LayerCompositor {
             const layer = node.layer;
             if (!layer.isVisible || layer.opacity === 0) return;
             const mode = layer.isPassThrough ? 'source-over' : layer.mixModeStr;
-            if (layer.groupId) {
+            if (layer.groupId || layer.mask?.enabled) {
                 isolated(node, (image) => drawBlended(context, mode, layer.opacity, (c) => c.drawImage(image, 0, 0)));
             } else {
                 drawBlended(context, mode, layer.opacity, (c) => drawLayer(c, layer));
             }
         };
         const passThrough = (context: CanvasRenderingContext2D, node: TNode<L>): void => {
-            if (node.layer.opacity === 1) {
+            if (node.layer.opacity === 1 && !node.layer.mask?.enabled) {
                 siblings(context, node.children);
                 return;
             }
@@ -83,14 +90,30 @@ export class LayerCompositor {
                 c.setTransform(context.getTransform());
                 siblings(c, node.children);
                 c.resetTransform();
-                c.globalCompositeOperation = 'destination-in';
-                c.globalAlpha = node.layer.opacity;
-                c.fillStyle = '#000';
-                c.fillRect(0, 0, image.width, image.height);
-                c.globalCompositeOperation = 'lighter';
-                c.globalAlpha = 1 - node.layer.opacity;
-                c.drawImage(context.canvas, 0, 0);
-                c.globalAlpha = 1;
+                this.surface(image.width, image.height, (coverage) => {
+                    const coverageCtx = ctx(coverage);
+                    coverageCtx.globalAlpha = node.layer.opacity;
+                    if (node.layer.mask?.enabled) {
+                        coverageCtx.setTransform(context.getTransform());
+                        coverageCtx.drawImage(this.maskCache.get(node.layer.mask, width, height), 0, 0);
+                        coverageCtx.resetTransform();
+                    } else {
+                        coverageCtx.fillStyle = '#fff';
+                        coverageCtx.fillRect(0, 0, coverage.width, coverage.height);
+                    }
+                    coverageCtx.globalAlpha = 1;
+                    c.globalCompositeOperation = 'destination-in';
+                    c.drawImage(coverage, 0, 0);
+                    this.surface(image.width, image.height, (backdrop) => {
+                        const b = ctx(backdrop);
+                        b.drawImage(context.canvas, 0, 0);
+                        b.globalCompositeOperation = 'destination-out';
+                        b.drawImage(coverage, 0, 0);
+                        b.globalCompositeOperation = 'source-over';
+                        c.globalCompositeOperation = 'lighter';
+                        c.drawImage(backdrop, 0, 0);
+                    });
+                });
                 c.globalCompositeOperation = 'source-over';
                 context.save();
                 context.resetTransform();
@@ -153,5 +176,6 @@ export class LayerCompositor {
     destroy(): void {
         this.canvases.forEach(freeCanvas);
         this.canvases = [];
+        this.maskCache.destroy();
     }
 }

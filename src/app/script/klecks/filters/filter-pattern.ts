@@ -346,6 +346,13 @@ export const filterPattern = {
             parentGroupId: layers[selectedLayerIndex].parentGroupId,
             isExpanded: layers[selectedLayerIndex].isExpanded,
             isPassThrough: layers[selectedLayerIndex].isPassThrough,
+            mask: layers[selectedLayerIndex].mask
+                ? {
+                      image: layers[selectedLayerIndex].mask.canvas,
+                      enabled: layers[selectedLayerIndex].mask.enabled,
+                      revision: layers[selectedLayerIndex].mask.revision,
+                  }
+                : undefined,
         };
         const previewLayerArr = layers.map((item, i) => {
             if (i === selectedLayerIndex) {
@@ -361,6 +368,13 @@ export const filterPattern = {
                     parentGroupId: item.parentGroupId,
                     isExpanded: item.isExpanded,
                     isPassThrough: item.isPassThrough,
+                    mask: item.mask
+                        ? {
+                              image: item.mask.canvas,
+                              enabled: item.mask.enabled,
+                              revision: item.mask.revision,
+                          }
+                        : undefined,
                 };
             }
         });

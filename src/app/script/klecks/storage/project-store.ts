@@ -36,7 +36,10 @@ export type TProjectStoreListener = {
 export function getProjectImageDataIds(raw: TIdb['V2']['ProjectStore']['Read']): string[] {
     return [
         ...(isImageDataReference(raw.thumbnail) ? [raw.thumbnail.id] : []),
-        ...raw.layers.flatMap((layer) => (isImageDataReference(layer.blob) ? [layer.blob.id] : [])),
+        ...raw.layers.flatMap((layer) => [
+            ...(isImageDataReference(layer.blob) ? [layer.blob.id] : []),
+            ...(layer.mask && isImageDataReference(layer.mask.blob) ? [layer.mask.blob.id] : []),
+        ]),
     ];
 }
 
@@ -66,9 +69,16 @@ export class ProjectStore {
                 id: blob.id,
                 data: layer.blob,
             });
+            let mask: TIdb['V2']['ProjectStore']['Write']['layers'][number]['mask'];
+            if (layer.mask) {
+                const maskBlob = { id: randomUuid() };
+                imageDataList.push({ id: maskBlob.id, data: layer.mask.blob });
+                mask = { ...layer.mask, blob: maskBlob };
+            }
             layers.push({
                 ...layer,
                 blob,
+                mask,
             });
         }
         const raw: TIdb['V2']['ProjectStore']['Write'] = {
@@ -165,6 +175,11 @@ export class ProjectStore {
                 const storedBlob = isImageDataReference(layer.blob)
                     ? transactionResult.imageDataById.get(layer.blob.id)
                     : layer.blob;
+                const storedMaskBlob = layer.mask
+                    ? isImageDataReference(layer.mask.blob)
+                        ? transactionResult.imageDataById.get(layer.mask.blob.id)
+                        : layer.mask.blob
+                    : undefined;
                 return {
                     ...layer,
                     isVisible: layer.isVisible ?? true,
@@ -172,6 +187,13 @@ export class ProjectStore {
                     hasClipping: layer.hasClipping ?? false,
                     // for now ignores the ImageData case because we only write blobs for browser storage projects
                     blob: isBlob(storedBlob) ? storedBlob : undefined,
+                    mask: layer.mask
+                        ? {
+                              ...layer.mask,
+                              blob: isBlob(storedMaskBlob) ? storedMaskBlob : undefined,
+                              enabled: layer.mask.enabled ?? true,
+                          }
+                        : undefined,
                 };
             },
         );

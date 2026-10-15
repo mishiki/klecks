@@ -10,6 +10,25 @@ export async function klCanvasToPsdBlob(
     isPreviewIncluded: boolean = true,
 ): Promise<Blob> {
     const layerArr = klCanvas.getLayers();
+    const documentWidth = klCanvas.getWidth();
+    const documentHeight = klCanvas.getHeight();
+    const getMask = (item: (typeof layerArr)[number]): Layer['mask'] => {
+        if (!item.mask) {
+            return undefined;
+        }
+        if (item.mask.canvas.width !== documentWidth || item.mask.canvas.height !== documentHeight) {
+            throw new Error('Layer mask size does not match document size');
+        }
+        return {
+            canvas: item.mask.canvas,
+            left: 0,
+            top: 0,
+            right: documentWidth,
+            bottom: documentHeight,
+            defaultColor: 255,
+            disabled: !item.mask.enabled,
+        };
+    };
     const groupById = new Map<string, Layer>();
     const parentById = new Map<string, string | null>();
     for (const item of layerArr) {
@@ -22,6 +41,7 @@ export async function klCanvasToPsdBlob(
                 clipping: item.hasClipping,
                 opened: item.isExpanded !== false,
                 children: [],
+                mask: getMask(item),
             });
             parentById.set(item.groupId, item.parentGroupId ?? null);
         }
@@ -40,6 +60,7 @@ export async function klCanvasToPsdBlob(
                   clipping: item.hasClipping,
                   left: 0,
                   top: 0,
+                  mask: getMask(item),
               };
         const parentId = item.parentGroupId;
         // Corrupt or stale parent references must not silently drop a layer on export.
@@ -68,8 +89,8 @@ export async function klCanvasToPsdBlob(
     }
 
     const psdConfig: Psd = {
-        width: klCanvas.getWidth(),
-        height: klCanvas.getHeight(),
+        width: documentWidth,
+        height: documentHeight,
         canvas,
         children,
     };

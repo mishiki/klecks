@@ -14,6 +14,7 @@ import {
     TKlProject,
     TRgb,
     TUiLayout,
+    isLayerFill,
 } from '../klecks/kl-types';
 import { importFilters } from '../klecks/filters/filters-lazy';
 import { klCanvasToPsdBlob } from '../klecks/storage/kl-canvas-to-psd-blob';
@@ -33,7 +34,7 @@ import { SaveToComputer } from '../klecks/storage/save-to-computer';
 import { ToolspaceScroller } from '../klecks/ui/components/toolspace-scroller';
 import { translateSmoothing } from '../klecks/utils/translate-smoothing';
 import { KlAppImportHandler } from './kl-app-import-handler';
-import { LayersUi } from '../klecks/ui/tool-tabs/layers-ui/layers-ui';
+import { LayersUi, TLayerEditTarget } from '../klecks/ui/tool-tabs/layers-ui/layers-ui';
 import { TCss, TVector2D } from '../bb/bb-types';
 import { asyncThrow, css, getFilenameDate, randomUuid, sleep } from '../bb/base/base';
 import { createConsoleApi } from './console-api';
@@ -57,7 +58,7 @@ import { PinchZoomWatcher } from '../klecks/ui/components/pinch-zoom-watcher';
 import { EASEL_MAX_SCALE, EASEL_MIN_SCALE } from '../klecks/ui/easel/easel.config';
 import { THistoryEntryDataComposed } from '../klecks/history/history.types';
 import { KlHistoryExecutor, THistoryExecutionType } from '../klecks/history/kl-history-executor';
-import { KlHistory } from '../klecks/history/kl-history';
+import { HISTORY_TILE_SIZE, KlHistory } from '../klecks/history/kl-history';
 import { isHistoryEntryActiveLayerChange } from '../klecks/history/push-helpers/is-history-entry-active-layer-change';
 import { MobileUi } from '../klecks/ui/mobile/mobile-ui';
 import { MobileToolUi } from '../klecks/ui/mobile/mobile-tool-ui';
@@ -72,6 +73,7 @@ import { requestPersistentStorage } from '../klecks/storage/request-persistent-s
 import { CrossTabChannel } from '../bb/base/cross-tab-channel';
 import { MobileColorUi } from '../klecks/ui/mobile/mobile-color-ui';
 import { PixelBrush } from '../klecks/brushes/pixel-brush';
+import { PenBrush } from '../klecks/brushes/pen-brush';
 import { getSelectionPath2d } from '../bb/multi-polygon/get-selection-path-2d';
 import { ToolspaceTopRow } from '../klecks/ui/components/toolspace-top-row';
 import { setupUnfocusOnClickService } from '../klecks/ui/onfocus-on-click-service';
@@ -353,6 +355,21 @@ export class KlApp {
         let mainTabRow: TabRow | undefined = undefined;
 
         const clearLayer = (showStatus?: boolean, ignoreSelection?: boolean) => {
+            if (currentLayerTarget === 'mask') {
+                finishMaskStroke();
+                const context = this.klCanvas.getLayerMaskContext(currentLayerIndex);
+                if (!context) {
+                    return;
+                }
+                context.save();
+                context.fillStyle = '#fff';
+                context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+                context.restore();
+                this.klCanvas.markLayerMaskChanged(currentLayerIndex);
+                this.klCanvas.pushLayerMaskHistory(currentLayerIndex);
+                this.easelProjectUpdater.update();
+                return;
+            }
             if (isCurrentLayerGroup()) {
                 return;
             }
@@ -382,6 +399,8 @@ export class KlApp {
                 width: this.klCanvas.getWidth(),
                 height: this.klCanvas.getHeight(),
                 layerCount: layers.length,
+                paintLayerCount: layers.filter((layer) => !layer.groupId).length,
+                maskCount: layers.filter((layer) => !!layer.mask).length,
                 visibleLayerCount: layers.filter((layer) => layer.isVisible && layer.opacity > 0).length,
                 background: this.klCanvas.getBackground(),
                 historyEntryCount: entries.length,
@@ -394,10 +413,41 @@ export class KlApp {
         });
         let lastNonEraserBrushId: TBrushId;
         let currentLayerIndex: number = this.klCanvas.getLayerCount() - 1;
+        let currentLayerTarget: TLayerEditTarget = 'image';
+        let imageColorBeforeMask: TRgb | undefined;
+        let maskControls: HTMLElement | undefined;
+        const maskBrush = new PenBrush();
+        maskBrush.setHistory(this.klHistory);
+        let maskStrokeActive = false;
+        let maskStrokeLayerIndex = -1;
+        const finishMaskStroke = () => {
+            if (!maskStrokeActive) {
+                return;
+            }
+            maskStrokeActive = false;
+            const layerIndex = maskStrokeLayerIndex;
+            try {
+                maskBrush.endLine();
+            } finally {
+                this.klHistory.pause(false);
+                this.toolspace.style.pointerEvents = '';
+                this.klCanvas.markLayerMaskChanged(layerIndex);
+                this.klCanvas.pushLayerMaskHistory(layerIndex);
+                this.easelProjectUpdater.update();
+                this.easel.requestRender();
+            }
+        };
+        const maskColor = (color: TRgb): TRgb => {
+            const gray = Math.round(color.r * 0.2126 + color.g * 0.7152 + color.b * 0.0722);
+            return { r: gray, g: gray, b: gray };
+        };
         const isCurrentLayerGroup = () => isGroupLayer(this.klCanvas.getLayer(currentLayerIndex));
 
         // when cycling through brushes you need to know the next non-eraser brush
         const getNextBrushId = (): TBrushId => {
+            if (currentLayerTarget === 'mask') {
+                return currentBrushId === 'eraserBrush' ? 'penBrush' : 'eraserBrush';
+            }
             if (currentBrushId === 'eraserBrush') {
                 return lastNonEraserBrushId;
             }
@@ -417,6 +467,7 @@ export class KlApp {
 
         const brushSettingService = new KL.BrushSettingService({
             onSetColor: (color) => {
+                color = currentLayerTarget === 'mask' ? maskColor(color) : color;
                 this.klColorSlider.setColor(color);
                 currentBrushUi.setColor(color);
                 this.mobileColorUi.setColor(color);
@@ -450,6 +501,71 @@ export class KlApp {
         });
 
         drawEventChain.setChainOut(((event: TDrawEvent) => {
+            if (event.type === 'up' && maskStrokeActive) {
+                finishMaskStroke();
+                return;
+            }
+            if (currentLayerTarget === 'mask' && this.klCanvas.getLayerMaskContext(currentLayerIndex)) {
+                if (event.type === 'down') {
+                    const context = this.klCanvas.getLayerMaskContext(currentLayerIndex)!;
+                    maskBrush.setContext(context);
+                    maskBrush.setSize(currentBrushUi.getSize());
+                    maskBrush.setOpacity(currentBrushUi.getOpacity());
+                    maskBrush.setColor(
+                        currentBrushId === 'eraserBrush'
+                            ? { r: 0, g: 0, b: 0 }
+                            : maskColor(currentColor),
+                    );
+                    maskStrokeLayerIndex = currentLayerIndex;
+                    this.klHistory.pause(true);
+                    maskStrokeActive = true;
+                    try {
+                        maskBrush.startLine(event.x, event.y, event.pressure ?? 1);
+                    } catch (error) {
+                        maskStrokeActive = false;
+                        this.klHistory.pause(false);
+                        this.toolspace.style.pointerEvents = '';
+                        throw error;
+                    }
+                    this.toolspace.style.pointerEvents = 'none';
+                } else if (event.type === 'move' && maskStrokeActive) {
+                    try {
+                        maskBrush.goLine(event.x, event.y, event.pressure ?? 1);
+                    } catch (error) {
+                        finishMaskStroke();
+                        throw error;
+                    }
+                } else if (event.type === 'line') {
+                    maskBrush.setContext(this.klCanvas.getLayerMaskContext(currentLayerIndex)!);
+                    maskBrush.setSize(currentBrushUi.getSize());
+                    maskBrush.setOpacity(currentBrushUi.getOpacity());
+                    maskBrush.setColor(
+                        currentBrushId === 'eraserBrush'
+                            ? { r: 0, g: 0, b: 0 }
+                            : maskColor(currentColor),
+                    );
+                    this.klHistory.pause(true);
+                    try {
+                        maskBrush.drawLineSegment(event.x0 ?? event.x1, event.y0 ?? event.y1, event.x1, event.y1);
+                    } finally {
+                        this.klHistory.pause(false);
+                    }
+                } else {
+                    return;
+                }
+                this.klCanvas.markLayerMaskChanged(currentLayerIndex);
+                if (event.type === 'line') {
+                    this.klCanvas.pushLayerMaskHistory(currentLayerIndex);
+                }
+                this.easelBrush.setLastDrawEvent(
+                    event.type === 'line'
+                        ? { x: event.x1, y: event.y1 }
+                        : { x: event.x, y: event.y },
+                );
+                this.easelProjectUpdater.update();
+                this.easel.requestRender();
+                return;
+            }
             if (isCurrentLayerGroup()) {
                 if (event.type === 'up') {
                     this.toolspace.style.pointerEvents = '';
@@ -540,6 +656,7 @@ export class KlApp {
         };
 
         const undo = (showMessage?: boolean) => {
+            finishMaskStroke();
             if (!tempHistory.canDecreaseIndex()) {
                 discardUncommitted();
             }
@@ -556,6 +673,7 @@ export class KlApp {
         };
 
         const redo = (showMessage?: boolean) => {
+            finishMaskStroke();
             const composedBefore = this.klHistory.getComposed();
             const result = klHistoryExecutor.redo();
             if (!result) {
@@ -579,7 +697,7 @@ export class KlApp {
             tempHistory,
             statusOverlay: this.statusOverlay,
             onFill: () => {
-                if (isCurrentLayerGroup()) {
+                if (currentLayerTarget === 'mask' || isCurrentLayerGroup()) {
                     return;
                 }
                 this.klCanvas.layerFill(
@@ -594,7 +712,7 @@ export class KlApp {
                 );
             },
             onErase: () => {
-                if (isCurrentLayerGroup()) {
+                if (currentLayerTarget === 'mask' || isCurrentLayerGroup()) {
                     return;
                 }
                 const layerIndex = currentLayerIndex;
@@ -677,7 +795,7 @@ export class KlApp {
         let isFirstTransform = true;
         this.easel = new Easel({
             onBeforeRender: () => {
-                if (!isCurrentLayerGroup()) {
+                if (currentLayerTarget === 'image' && !isCurrentLayerGroup()) {
                     currentBrushUi?.getBrush().transferToCanvas?.();
                 }
             },
@@ -714,7 +832,7 @@ export class KlApp {
                 }),
                 paintBucket: new EaselPaintBucket({
                     onFill: (p) => {
-                        if (isCurrentLayerGroup()) {
+                        if (currentLayerTarget === 'mask' || isCurrentLayerGroup()) {
                             return;
                         }
                         this.klCanvas.floodFill(
@@ -744,7 +862,11 @@ export class KlApp {
                 }),
                 text: new EaselText({
                     onDown: (p, angleRad) => {
-                        if (KL.DIALOG_COUNTER.get() > 0 || isCurrentLayerGroup()) {
+                        if (
+                            KL.DIALOG_COUNTER.get() > 0 ||
+                            currentLayerTarget === 'mask' ||
+                            isCurrentLayerGroup()
+                        ) {
                             return;
                         }
 
@@ -1005,7 +1127,11 @@ export class KlApp {
                     );
                 }
                 if (comboStr === 'enter' && !isRepeat) {
-                    if (!applyUncommitted() && !isCurrentLayerGroup()) {
+                    if (
+                        currentLayerTarget !== 'mask' &&
+                        !applyUncommitted() &&
+                        !isCurrentLayerGroup()
+                    ) {
                         this.klCanvas.layerFill(
                             currentLayerIndex,
                             this.klColorSlider.getColor(),
@@ -1066,6 +1192,9 @@ export class KlApp {
                     this.toolspaceToolRow.setActive('hand', true);
                 }
                 if (comboStr === 'g' && !isRepeat) {
+                    if (currentLayerTarget === 'mask') {
+                        return;
+                    }
                     event.preventDefault();
                     applyUncommitted();
                     const newMode =
@@ -1076,6 +1205,9 @@ export class KlApp {
                     updateMainTabVisibility();
                 }
                 if (comboStr === 't' && !isRepeat) {
+                    if (currentLayerTarget === 'mask') {
+                        return;
+                    }
                     event.preventDefault();
                     applyUncommitted();
                     this.toolspaceToolRow.setActive('text');
@@ -1084,6 +1216,9 @@ export class KlApp {
                     updateMainTabVisibility();
                 }
                 if (comboStr === 'u' && !isRepeat) {
+                    if (currentLayerTarget === 'mask') {
+                        return;
+                    }
                     event.preventDefault();
                     applyUncommitted();
                     this.toolspaceToolRow.setActive('shape');
@@ -1092,6 +1227,9 @@ export class KlApp {
                     updateMainTabVisibility();
                 }
                 if (comboStr === 'l' && !isRepeat) {
+                    if (currentLayerTarget === 'mask') {
+                        return;
+                    }
                     event.preventDefault();
                     const prevTool = this.easel.getTool();
                     const prevSelectMode = klAppSelect.getSelectMode();
@@ -1189,9 +1327,19 @@ export class KlApp {
             brushSettingService,
             onBrush: (brushId) => {
                 this.toolspaceToolRow.setActive('brush', true);
-                brushTabRow.open(brushId);
+                brushTabRow.open(
+                    currentLayerTarget === 'mask' && brushId !== 'eraserBrush'
+                        ? 'penBrush'
+                        : brushId,
+                );
             },
             onTool: (toolId) => {
+                if (
+                    currentLayerTarget === 'mask' &&
+                    toolId !== 'hand'
+                ) {
+                    return false;
+                }
                 if (toolId === 'select' || toolId === 'transform') {
                     this.toolspaceToolRow.setActive('select', true);
                     // transform can be rejected, if there's nothing to transform
@@ -1352,6 +1500,17 @@ export class KlApp {
 
         this.toolspaceToolRow = new KL.ToolspaceToolRow({
             onActivate: (activeStr) => {
+                if (
+                    currentLayerTarget === 'mask' &&
+                    activeStr !== 'brush' &&
+                    activeStr !== 'hand'
+                ) {
+                    this.toolspaceToolRow.setActive('brush');
+                    this.easel.setTool('brush');
+                    mainTabRow?.open('brush');
+                    updateMainTabVisibility();
+                    return;
+                }
                 // hand doesn't cause changes. Select -> can resume uncommitted transform after hand
                 if (activeStr !== 'hand' && activeStr !== 'select') {
                     applyUncommitted();
@@ -1407,6 +1566,10 @@ export class KlApp {
         this.toolspaceInner.append(this.toolspaceToolRow.getElement());
 
         const setBrushColor = (p_color: TRgb) => {
+            p_color = currentLayerTarget === 'mask' ? maskColor(p_color) : p_color;
+            if (currentLayerTarget === 'mask') {
+                this.klColorSlider.setColor(p_color);
+            }
             currentColor = p_color;
             currentBrushUi.setColor(p_color);
             brushSettingService.emitColor(p_color);
@@ -1467,8 +1630,38 @@ export class KlApp {
             updateMainTabVisibility();
         };
 
-        const setCurrentLayer = (index: number) => {
+        const setCurrentLayer = (index: number, target: TLayerEditTarget = currentLayerTarget) => {
+            finishMaskStroke();
             currentLayerIndex = index;
+            const nextTarget: TLayerEditTarget =
+                target === 'mask' && this.klCanvas.getLayer(index).mask ? 'mask' : 'image';
+            if (nextTarget !== currentLayerTarget) {
+                if (nextTarget === 'mask') {
+                    imageColorBeforeMask = currentColor;
+                    currentLayerTarget = 'mask';
+                    brushSettingService.setColor({ r: 0, g: 0, b: 0 });
+                } else {
+                    currentLayerTarget = 'image';
+                    if (imageColorBeforeMask) {
+                        brushSettingService.setColor(imageColorBeforeMask);
+                        imageColorBeforeMask = undefined;
+                    }
+                }
+                maskControls && (maskControls.style.display = nextTarget === 'mask' ? 'block' : 'none');
+                for (const id of Object.keys(KL.BRUSHES_UI) as TBrushId[]) {
+                    brushTabRow.setIsVisible(
+                        id,
+                        nextTarget === 'image' || id === 'penBrush' || id === 'eraserBrush',
+                    );
+                }
+                if (nextTarget === 'mask') {
+                    brushTabRow.open('penBrush');
+                    this.toolspaceToolRow.setActive('brush');
+                    this.easel.setTool('brush');
+                    mainTabRow?.open('brush');
+                    updateMainTabVisibility();
+                }
+            }
             currentBrushUi.setLayer(this.klCanvas.getLayer(currentLayerIndex));
         };
 
@@ -1490,6 +1683,34 @@ export class KlApp {
         });
 
         brushDiv.append(colorDiv);
+        maskControls = BB.el({
+            css: { display: 'none', padding: '0 10px 4px' },
+        });
+        maskControls.append(
+            BB.el({ textContent: LANG('layers-mask-paint'), css: { fontSize: 12, marginBottom: 5 } }),
+        );
+        const maskColorButtons = BB.el({ css: { display: 'flex', gap: 5 } });
+        for (const [key, gray] of [
+            ['layers-mask-black', 0],
+            ['layers-mask-white', 255],
+        ] as const) {
+            maskColorButtons.append(
+                BB.el({
+                    tagName: 'button',
+                    className: 'kl-button',
+                    textContent: LANG(key),
+                    css: { flex: 1 },
+                    onClick: () => {
+                        if (currentBrushId === 'eraserBrush' && gray === 255) {
+                            brushTabRow.open('penBrush');
+                        }
+                        brushSettingService.setColor({ r: gray, g: gray, b: gray });
+                    },
+                }),
+            );
+        }
+        maskControls.append(maskColorButtons);
+        brushDiv.prepend(maskControls);
         BB.append(colorDiv, [
             this.klColorSlider.getElement(),
             this.klColorSlider.getOutputElement(),
@@ -1586,7 +1807,7 @@ export class KlApp {
 
         const gradientTool = new KL.GradientTool({
             onGradient: (isDone, x1, y1, x2, y2, angleRad) => {
-                if (isCurrentLayerGroup()) {
+                if (currentLayerTarget === 'mask' || isCurrentLayerGroup()) {
                     return;
                 }
                 const layerIndex = currentLayerIndex;
@@ -1627,7 +1848,7 @@ export class KlApp {
 
         const shapeTool = new KL.ShapeTool({
             onShape: (isDone, x1, y1, x2, y2, angleRad) => {
-                if (isCurrentLayerGroup()) {
+                if (currentLayerTarget === 'mask' || isCurrentLayerGroup()) {
                     return;
                 }
                 const layerIndex = currentLayerIndex;
@@ -1680,8 +1901,8 @@ export class KlApp {
         this.floatingLayerPreview = new FloatingLayerPreview();
         this.layersUi = new KL.LayersUi({
             klCanvas: this.klCanvas,
-            onSelect: (layerIndex, pushHistory) => {
-                setCurrentLayer(layerIndex);
+            onSelect: (layerIndex, pushHistory, target) => {
+                setCurrentLayer(layerIndex, target);
 
                 if (pushHistory) {
                     const topEntry = this.klHistory.getEntries().at(-1)!.data;
@@ -1723,6 +1944,7 @@ export class KlApp {
             maxCanvasSize,
             klCanvas: this.klCanvas,
             getCurrentLayerIndex: () => currentLayerIndex,
+            getCurrentLayerTarget: () => currentLayerTarget,
             isEmbed: !!this.embed,
             statusOverlay: this.statusOverlay,
             onCanvasChanged: () => {
@@ -1792,6 +2014,9 @@ export class KlApp {
                     return this.klCanvas.getCanvas(1, maskSelection);
                 },
                 (inputObj) => {
+                    if (currentLayerTarget === 'mask') {
+                        return;
+                    }
                     if (
                         inputObj.left === 0 &&
                         inputObj.right === 0 &&
@@ -1904,10 +2129,40 @@ export class KlApp {
                             ctx.drawImage(item.image, 0, 0);
                         }
                     }
+                    let mask: { image: HTMLCanvasElement; enabled: boolean; revision?: number } | undefined;
+                    if (item.mask) {
+                        const source = item.mask.image;
+                        const maskCanvas = BB.canvas(project.project.width, project.project.height);
+                        const context = BB.ctx(maskCanvas);
+                        if (source instanceof HTMLCanvasElement || source instanceof HTMLImageElement) {
+                            context.drawImage(source, 0, 0);
+                        } else if (isLayerFill(source)) {
+                            context.fillStyle = source.fill;
+                            context.fillRect(0, 0, maskCanvas.width, maskCanvas.height);
+                        } else {
+                            const tilesPerRow = Math.ceil(maskCanvas.width / HISTORY_TILE_SIZE);
+                            source.forEach((tile, tileIndex) => {
+                                const x = (tileIndex % tilesPerRow) * HISTORY_TILE_SIZE;
+                                const y = Math.floor(tileIndex / tilesPerRow) * HISTORY_TILE_SIZE;
+                                if (isLayerFill(tile)) {
+                                    context.fillStyle = tile.fill;
+                                    context.fillRect(x, y, HISTORY_TILE_SIZE, HISTORY_TILE_SIZE);
+                                } else {
+                                    context.putImageData(tile.data, x, y);
+                                }
+                            });
+                        }
+                        mask = {
+                            image: maskCanvas,
+                            enabled: item.mask.enabled,
+                            revision: item.mask.revision,
+                        };
+                    }
                     return {
                         ...item,
                         id: randomUuid(),
                         image,
+                        mask,
                     };
                 }),
             });

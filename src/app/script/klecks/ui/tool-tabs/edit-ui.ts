@@ -7,7 +7,7 @@ import { KlCanvas } from '../../canvas/kl-canvas';
 import { LANG } from '../../../language/language';
 import { TFilterApply, TFilterGetDialogParam, TFilterGetDialogResult } from '../../kl-types';
 import { KlColorSlider } from '../components/kl-color-slider';
-import { LayersUi } from './layers-ui/layers-ui';
+import { LayersUi, TLayerEditTarget } from './layers-ui/layers-ui';
 import { RGB } from '../../../bb/color/color';
 import { getSharedFx } from '../../../fx-canvas/shared-fx';
 import { c } from '../../../bb/base/c';
@@ -27,6 +27,7 @@ export type TEditUiParams = {
     maxCanvasSize: number;
     klCanvas: KlCanvas;
     getCurrentLayerIndex: () => number;
+    getCurrentLayerTarget: () => TLayerEditTarget;
     isEmbed: boolean;
     statusOverlay: StatusOverlay;
     onCanvasChanged: () => void; // dimensions/orientation changed
@@ -45,6 +46,7 @@ export class EditUi {
     private readonly maxCanvasSize: number;
     private readonly klCanvas: KlCanvas;
     private readonly getCurrentLayerIndex: () => number;
+    private readonly getCurrentLayerTarget: () => TLayerEditTarget;
     private readonly isEmbed: boolean;
     private readonly statusOverlay: StatusOverlay;
     private readonly onCanvasChanged: () => void; // dimensions/orientation changed
@@ -110,8 +112,9 @@ This has been reported to Google.
             const filter = filters[filterKey];
             const isCanvasFilter = ['cropExtend', 'resize', 'rotate'].includes(filterKey);
             const isLayerFilterBlocked = () =>
-                !isCanvasFilter &&
-                isGroupLayer(this.klCanvas.getLayer(this.getCurrentLayerIndex()));
+                this.getCurrentLayerTarget() === 'mask' ||
+                (!isCanvasFilter &&
+                    isGroupLayer(this.klCanvas.getLayer(this.getCurrentLayerIndex())));
 
             const button = BB.el({
                 tagName: 'button',
@@ -392,6 +395,7 @@ This has been reported to Google.
         this.maxCanvasSize = p.maxCanvasSize;
         this.klCanvas = p.klCanvas;
         this.getCurrentLayerIndex = p.getCurrentLayerIndex;
+        this.getCurrentLayerTarget = p.getCurrentLayerTarget;
         this.isEmbed = p.isEmbed;
         this.statusOverlay = p.statusOverlay;
         this.onCanvasChanged = p.onCanvasChanged;

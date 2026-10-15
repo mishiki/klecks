@@ -91,6 +91,20 @@ export function entryCausesChange(
                 // not needed currently
                 return true;
             }
+            if (entryLayer.mask === null && composedLayer.mask !== null) {
+                return true;
+            }
+            if (entryLayer.mask) {
+                if (!composedLayer.mask || entryLayer.mask.tiles !== undefined) {
+                    return true;
+                }
+                if (
+                    entryLayer.mask.enabled !== undefined &&
+                    entryLayer.mask.enabled !== composedLayer.mask.enabled
+                ) {
+                    return true;
+                }
+            }
         }
     }
     return false;

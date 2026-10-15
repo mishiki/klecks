@@ -89,6 +89,7 @@ export type TKlLayer<GImage> = {
     opacity: number;
     hasClipping: boolean;
     image: GImage;
+    mask?: { image: GImage; enabled: boolean; revision?: number };
     // A group is a postorder marker after its children in the flat layer array.
     groupId?: string | null;
     parentGroupId?: string | null;

@@ -129,6 +129,9 @@ export class KlAppImportHandler {
                         if (!item.groupId) {
                             crop(item.image, cropCanvas, cropObj);
                         }
+                        if (item.mask) {
+                            crop(item.mask.image, cropCanvas, cropObj);
+                        }
                     }
                 }
             }
@@ -152,6 +155,13 @@ export class KlAppImportHandler {
                     const item = convertedPsdObj.layers[i];
                     if (!item.groupId) {
                         BB.resizeCanvas(item.image, convertedPsdObj.width, convertedPsdObj.height);
+                    }
+                    if (item.mask) {
+                        BB.resizeCanvas(
+                            item.mask.image,
+                            convertedPsdObj.width,
+                            convertedPsdObj.height,
+                        );
                     }
                 }
             }
@@ -183,6 +193,7 @@ export class KlAppImportHandler {
                             isExpanded: layer.isExpanded,
                             isPassThrough: layer.isPassThrough,
                             image: layer.image,
+                            mask: layer.mask,
                         };
                     }),
                 });

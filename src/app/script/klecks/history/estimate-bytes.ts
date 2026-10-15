@@ -27,7 +27,7 @@ export function estimateBytes(entry: THistoryEntryData): number {
 
     entry.layerMap &&
         Object.entries(entry.layerMap).forEach(([, layer]) => {
-            layer.tiles?.forEach((tile) => {
+            [...(layer.tiles ?? []), ...(layer.mask?.tiles ?? [])].forEach((tile) => {
                 if (tile === undefined) {
                     return;
                 }

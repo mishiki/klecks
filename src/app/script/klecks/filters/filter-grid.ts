@@ -154,6 +154,13 @@ export const filterGrid = {
                 parentGroupId: item.parentGroupId,
                 isExpanded: item.isExpanded,
                 isPassThrough: item.isPassThrough,
+                mask: item.mask
+                    ? {
+                          image: item.mask.canvas,
+                          enabled: item.mask.enabled,
+                          revision: item.mask.revision,
+                      }
+                    : undefined,
             };
         });
 

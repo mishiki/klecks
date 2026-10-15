@@ -2,6 +2,8 @@ export type TDiagnosticProjectSnapshot = {
     width: number;
     height: number;
     layerCount: number;
+    paintLayerCount?: number;
+    maskCount?: number;
     visibleLayerCount: number;
     background?: string;
     historyEstimatedBytes?: number;
@@ -254,7 +256,7 @@ class DiagnosticsRecorder {
             stopReason: this.stopReason,
             environment: this.environment,
             projectSnapshots: this.projectSnapshots,
-            rawRgbaEstimateNote: 'Theoretical width x height x layerCount x 4 byte estimate; not allocated memory.',
+            rawRgbaEstimateNote: 'Theoretical width x height x (paintLayerCount + maskCount) x 4 byte estimate; excludes folder markers, history, scratch canvases and GPU allocations.',
             rafIntervalNote: 'requestAnimationFrame callback cadence; this is not actual paint FPS.',
             renderTimingNote: 'Render duration is CPU-side submission time; it does not measure GPU completion.',
             recorderOverheadNote: 'Instrumentation itself adds some runtime overhead.',
@@ -358,10 +360,12 @@ class DiagnosticsRecorder {
             const width = finiteNonNegative(snapshot.width);
             const height = finiteNonNegative(snapshot.height);
             const layerCount = finiteNonNegative(snapshot.layerCount);
-            const estimate = width !== null && height !== null && layerCount !== null
-                ? width * height * layerCount * 4 : Number.NaN;
+            const paintLayerCount = finiteNonNegative(snapshot.paintLayerCount) ?? layerCount;
+            const maskCount = finiteNonNegative(snapshot.maskCount) ?? 0;
+            const estimate = width !== null && height !== null && paintLayerCount !== null && maskCount !== null
+                ? width * height * (paintLayerCount + maskCount) * 4 : Number.NaN;
             const item: Record<string, unknown> = {
-                tMs: this.elapsedMs(), width, height, layerCount,
+                tMs: this.elapsedMs(), width, height, layerCount, paintLayerCount, maskCount,
                 visibleLayerCount: finiteNonNegative(snapshot.visibleLayerCount),
                 background: safeColor(snapshot.background) ?? null,
                 historyEstimatedBytes: finiteNonNegative(snapshot.historyEstimatedBytes),

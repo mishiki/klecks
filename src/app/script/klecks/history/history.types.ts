@@ -13,6 +13,10 @@ export type TImageDataTile = {
 // image data, or a fill color
 // can be transparent: {fill: 'transparent'} -> useful if empty layer
 export type THistoryEntryLayerTile = TImageDataTile | TLayerFill;
+export type THistoryEntryLayerMask = {
+    enabled?: boolean;
+    tiles?: (THistoryEntryLayerTile | undefined)[];
+};
 export type THistoryEntryLayer = {
     // if layer exists but did not change, must be in the layerMap. object can be empty
 
@@ -42,6 +46,9 @@ export type THistoryEntryLayer = {
 
     // if contents changed
     tiles?: (THistoryEntryLayerTile | undefined)[]; // undefined if tile did not change
+
+    // undefined means unchanged, null removes the mask. A new mask supplies enabled and all tiles.
+    mask?: THistoryEntryLayerMask | null;
 };
 export type THistoryEntryData = {
     // if document background changed
@@ -78,8 +85,9 @@ export type THistoryEntry = {
     data: THistoryEntryData;
 };
 
-export type THistoryEntryLayerComposed = Omit<Required<THistoryEntryLayer>, 'tiles'> & {
+export type THistoryEntryLayerComposed = Omit<Required<THistoryEntryLayer>, 'tiles' | 'mask'> & {
     tiles: THistoryEntryLayerTile[];
+    mask: { enabled: boolean; tiles: THistoryEntryLayerTile[] } | null;
 };
 
 export type THistoryEntryDataComposed = Omit<Required<THistoryEntryData>, 'layerMap'> & {

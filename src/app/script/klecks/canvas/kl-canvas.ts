@@ -11,6 +11,7 @@ import {
     TKlNamedLayer,
     TCanvasBackground,
     TKlProject,
+    isLayerFill,
     TMixMode,
     TRgb,
     TShapeToolObject,
@@ -31,6 +32,7 @@ import { getNextLayerId } from '../history/get-next-layer-id';
 import {
     THistoryEntryDataComposed,
     THistoryEntryLayerComposed,
+    THistoryEntryLayerTile,
     TLayerId,
 } from '../history/history.types';
 import { createFillColorTiles } from '../history/create-fill-color-tiles';
@@ -39,6 +41,7 @@ import { isHistoryEntryOpacityChange } from '../history/push-helpers/is-history-
 import { isHistoryEntryVisibilityChange } from '../history/push-helpers/is-history-entry-visibility-change';
 import { transformCoordinateBounds } from '../../bb/transform/transform-coordinate-bounds';
 import { createLayerMap } from '../history/push-helpers/create-layer-map';
+import { canvasToLayerTiles } from '../history/push-helpers/canvas-to-layer-tiles';
 import { Eyedropper } from './eyedropper';
 import { randomUuid } from '../../bb/base/base';
 import { translateMultiPolygon } from '../../bb/multi-polygon/translate-multi-polygon';
@@ -65,6 +68,12 @@ export type TKlCanvasLayer = {
     compositeObj?: TLayerComposite;
     canvas: HTMLCanvasElement;
     context: CanvasRenderingContext2D;
+    mask?: {
+        canvas: HTMLCanvasElement;
+        context: CanvasRenderingContext2D;
+        enabled: boolean;
+        revision: number;
+    };
 };
 
 export type TLayerComposite = {
@@ -86,6 +95,31 @@ export class KlCanvas {
     private eyedropper: Eyedropper;
     private selection: undefined | MultiPolygon = undefined;
     private readonly klHistory: KlHistory;
+
+    private createMask(
+        image?: HTMLCanvasElement | HTMLImageElement,
+        enabled = true,
+    ): NonNullable<TKlCanvasLayer['mask']> {
+        const canvas = BB.canvas(this.width, this.height);
+        const context = BB.ctx(canvas);
+        context.fillStyle = 'white';
+        context.fillRect(0, 0, this.width, this.height);
+        if (image) {
+            context.drawImage(image, 0, 0);
+            const data = context.getImageData(0, 0, this.width, this.height);
+            for (let i = 0; i < data.data.length; i += 4) {
+                const gray = Math.round(
+                    data.data[i] * 0.2126 + data.data[i + 1] * 0.7152 + data.data[i + 2] * 0.0722,
+                );
+                data.data[i] = gray;
+                data.data[i + 1] = gray;
+                data.data[i + 2] = gray;
+                data.data[i + 3] = 255;
+            }
+            context.putImageData(data, 0, 0);
+        }
+        return { canvas, context, enabled, revision: 1 };
+    }
 
     private updateIndices(): void {
         this.layers.forEach((item, index) => {
@@ -215,6 +249,13 @@ export class KlCanvas {
                     if (!isGroupLayer(layer)) {
                         layer.context.drawImage(pItem.image, 0, 0);
                     }
+                    const replacementMask = pItem.mask
+                        ? this.createMask(pItem.mask.image, pItem.mask.enabled)
+                        : undefined;
+                    if (layer.mask) {
+                        BB.freeCanvas(layer.mask.canvas);
+                    }
+                    layer.mask = replacementMask;
                     this.setOpacity(i, pItem.opacity);
                 }
                 if (this.getTopPaintIndex() < 0) {
@@ -229,6 +270,10 @@ export class KlCanvas {
                 layer.parentGroupId = null;
                 layer.isExpanded = true;
                 layer.isPassThrough = false;
+                if (layer.mask) {
+                    BB.freeCanvas(layer.mask.canvas);
+                    layer.mask = undefined;
+                }
                 changeCanvasDimensions(layer.canvas, this.width, this.height, {
                     ensureCleared: true,
                 });
@@ -325,26 +370,34 @@ export class KlCanvas {
             const tmp1Ctx = BB.ctx(tmp1);
             tmp1Ctx.imageSmoothingEnabled = false;
             for (let i = 0; i < this.layers.length; i++) {
-                if (isGroupLayer(this.layers[i])) {
-                    continue;
-                }
-                if (i > 0) {
-                    tmp1Ctx.clearRect(0, 0, w, h);
-                }
                 const layer = this.layers[i];
-                tmp1Ctx.drawImage(layer.canvas, 0, 0, w, h);
-                changeCanvasDimensions(layer.canvas, w, h, { ensureCleared: true });
-                layer.context.drawImage(tmp1, 0, 0);
+                if (!isGroupLayer(layer)) {
+                    tmp1Ctx.clearRect(0, 0, w, h);
+                    tmp1Ctx.drawImage(layer.canvas, 0, 0, w, h);
+                    changeCanvasDimensions(layer.canvas, w, h, { ensureCleared: true });
+                    layer.context.drawImage(tmp1, 0, 0);
+                }
+                if (layer.mask) {
+                    tmp1Ctx.clearRect(0, 0, w, h);
+                    tmp1Ctx.drawImage(layer.mask.canvas, 0, 0, w, h);
+                    changeCanvasDimensions(layer.mask.canvas, w, h, { ensureCleared: true });
+                    layer.mask.context.drawImage(tmp1, 0, 0);
+                    layer.mask.revision++;
+                }
             }
         } else {
             // smooth
             tmp1 = BB.canvas();
             tmp2 = BB.canvas();
             for (let i = 0; i < this.layers.length; i++) {
-                if (isGroupLayer(this.layers[i])) {
-                    continue;
+                const layer = this.layers[i];
+                if (!isGroupLayer(layer)) {
+                    BB.resizeCanvas(layer.canvas, w, h, tmp1, tmp2);
                 }
-                BB.resizeCanvas(this.layers[i].canvas, w, h, tmp1, tmp2);
+                if (layer.mask) {
+                    BB.resizeCanvas(layer.mask.canvas, w, h, tmp1, tmp2);
+                    layer.mask.revision++;
+                }
             }
         }
 
@@ -362,9 +415,14 @@ export class KlCanvas {
                 width: this.width,
                 height: this.height,
             },
-            layerMap: createLayerMap(this.layers, { attributes: ['tiles'] }),
+            layerMap: createLayerMap(this.layers, { attributes: ['tiles', 'mask'] }),
             ...(this.selection ? { selection: { value: this.selection } } : {}),
         });
+
+        BB.freeCanvas(tmp1);
+        if (tmp2) {
+            BB.freeCanvas(tmp2);
+        }
 
         return true;
     }
@@ -390,23 +448,33 @@ export class KlCanvas {
 
         const bottomPaintIndex = this.layers.findIndex((layer) => !isGroupLayer(layer));
         for (let i = 0; i < this.layers.length; i++) {
-            if (isGroupLayer(this.layers[i])) {
-                continue;
-            }
-            const ctemp = BB.canvas(this.width, this.height);
             const layer = this.layers[i];
-            BB.ctx(ctemp).drawImage(layer.canvas, 0, 0);
+            if (!isGroupLayer(layer)) {
+                const ctemp = BB.canvas(this.width, this.height);
+                BB.ctx(ctemp).drawImage(layer.canvas, 0, 0);
 
-            changeCanvasDimensions(layer.canvas, newW, newH, { ensureCleared: true });
+                changeCanvasDimensions(layer.canvas, newW, newH, { ensureCleared: true });
 
-            layer.context.save();
-            if (i === bottomPaintIndex && p.fillColor) {
-                layer.context.fillStyle = BB.ColorConverter.toRgbStr(p.fillColor);
-                layer.context.fillRect(0, 0, newW, newH);
-                layer.context.clearRect(offX, offY, this.width, this.height);
+                layer.context.save();
+                if (i === bottomPaintIndex && p.fillColor) {
+                    layer.context.fillStyle = BB.ColorConverter.toRgbStr(p.fillColor);
+                    layer.context.fillRect(0, 0, newW, newH);
+                    layer.context.clearRect(offX, offY, this.width, this.height);
+                }
+                layer.context.drawImage(ctemp, offX, offY);
+                layer.context.restore();
+                BB.freeCanvas(ctemp);
             }
-            layer.context.drawImage(ctemp, offX, offY);
-            layer.context.restore();
+            if (layer.mask) {
+                const maskTemp = BB.canvas(this.width, this.height);
+                BB.ctx(maskTemp).drawImage(layer.mask.canvas, 0, 0);
+                changeCanvasDimensions(layer.mask.canvas, newW, newH, { ensureCleared: true });
+                layer.mask.context.fillStyle = 'white';
+                layer.mask.context.fillRect(0, 0, newW, newH);
+                layer.mask.context.drawImage(maskTemp, offX, offY);
+                layer.mask.revision++;
+                BB.freeCanvas(maskTemp);
+            }
         }
         this.width = newW;
         this.height = newH;
@@ -419,7 +487,7 @@ export class KlCanvas {
                 width: this.width,
                 height: this.height,
             },
-            layerMap: createLayerMap(this.layers, { attributes: ['tiles'] }),
+            layerMap: createLayerMap(this.layers, { attributes: ['tiles', 'mask'] }),
             ...(this.selection ? { selection: { value: this.selection } } : {}),
         });
         return true;
@@ -437,6 +505,7 @@ export class KlCanvas {
             isVisible: boolean;
             opacity: number;
             image: HTMLCanvasElement | HTMLImageElement | ((ctx: CanvasRenderingContext2D) => void);
+            mask?: { image: HTMLCanvasElement | HTMLImageElement; enabled: boolean };
         },
     ): false | number {
         if (this.isLayerLimitReached()) {
@@ -485,6 +554,7 @@ export class KlCanvas {
             isPassThrough: false,
             canvas,
             context,
+            mask: data?.mask ? this.createMask(data.mask.image, data.mask.enabled) : undefined,
         };
 
         this.layers.splice(index, 0, layer);
@@ -583,6 +653,9 @@ export class KlCanvas {
             if (!isGroupLayer(source)) {
                 context.drawImage(source.canvas, 0, 0);
             }
+            const mask = source.mask
+                ? this.createMask(source.mask.canvas, source.mask.enabled)
+                : undefined;
             return {
                 ...source,
                 id: getNextLayerId(),
@@ -596,6 +669,7 @@ export class KlCanvas {
                     : null,
                 canvas,
                 context,
+                mask,
                 compositeObj: undefined,
             };
         });
@@ -629,6 +703,144 @@ export class KlCanvas {
         );
     }
 
+    addLayerMask(index: number): boolean {
+        const layer = this.layers[index];
+        if (!layer || layer.mask) {
+            return false;
+        }
+        layer.mask = this.createMask();
+        if (!this.klHistory.isPaused()) {
+            const layerMap = createLayerMap(this.layers, { layerId: layer.id, attributes: [] });
+            layerMap[layer.id].mask = {
+                enabled: true,
+                tiles: createFillColorTiles(this.width, this.height, 'white'),
+            };
+            this.klHistory.push({ layerMap });
+        }
+        return true;
+    }
+
+    removeLayerMask(index: number): boolean {
+        const layer = this.layers[index];
+        if (!layer?.mask) {
+            return false;
+        }
+        BB.freeCanvas(layer.mask.canvas);
+        layer.mask = undefined;
+        if (!this.klHistory.isPaused()) {
+            const layerMap = createLayerMap(this.layers, { layerId: layer.id, attributes: [] });
+            layerMap[layer.id].mask = null;
+            this.klHistory.push({ layerMap });
+        }
+        return true;
+    }
+
+    setLayerMaskEnabled(index: number, enabled: boolean): boolean {
+        const layer = this.layers[index];
+        if (!layer?.mask || layer.mask.enabled === enabled) {
+            return false;
+        }
+        layer.mask.enabled = enabled;
+        layer.mask.revision++;
+        if (!this.klHistory.isPaused()) {
+            const layerMap = createLayerMap(this.layers, { layerId: layer.id, attributes: [] });
+            layerMap[layer.id].mask = { enabled };
+            this.klHistory.push({ layerMap });
+        }
+        return true;
+    }
+
+    invertLayerMask(index: number): boolean {
+        const context = this.getLayerMaskContext(index);
+        if (!context) {
+            return false;
+        }
+        const data = context.getImageData(0, 0, this.width, this.height);
+        for (let i = 0; i < data.data.length; i += 4) {
+            const gray = 255 - Math.round(
+                data.data[i] * 0.2126 + data.data[i + 1] * 0.7152 + data.data[i + 2] * 0.0722,
+            );
+            data.data[i] = gray;
+            data.data[i + 1] = gray;
+            data.data[i + 2] = gray;
+            data.data[i + 3] = 255;
+        }
+        context.putImageData(data, 0, 0);
+        this.markLayerMaskChanged(index);
+        this.pushLayerMaskHistory(index);
+        return true;
+    }
+
+    getLayerMaskContext(index: number): CanvasRenderingContext2D | null {
+        return this.layers[index]?.mask?.context ?? null;
+    }
+
+    /** Call while painting so live compositing knows the mask pixels changed. */
+    markLayerMaskChanged(index: number): boolean {
+        const mask = this.layers[index]?.mask;
+        if (!mask) {
+            return false;
+        }
+        mask.revision++;
+        return true;
+    }
+
+    /** Commit mask pixels after a stroke. Unchanged tiles are omitted from the history entry. */
+    pushLayerMaskHistory(index: number): boolean {
+        const layer = this.layers[index];
+        if (!layer?.mask || this.klHistory.isPaused()) {
+            return false;
+        }
+        const composedMask = this.klHistory.getComposed().layerMap[layer.id]?.mask;
+        const currentTiles = canvasToLayerTiles(layer.mask.canvas);
+        const changedTiles: (THistoryEntryLayerTile | undefined)[] = currentTiles.map((tile, tileIndex) => {
+            const old = composedMask?.tiles[tileIndex];
+            if (!old || isLayerFill(tile)) {
+                return tile;
+            }
+            const pixels = tile.data.data;
+            if (isLayerFill(old)) {
+                const value = old.fill === 'white' ? 255 : old.fill === 'black' ? 0 : -1;
+                if (value >= 0) {
+                    for (let i = 0; i < pixels.length; i += 4) {
+                        if (
+                            pixels[i] !== value || pixels[i + 1] !== value ||
+                            pixels[i + 2] !== value || pixels[i + 3] !== 255
+                        ) {
+                            return tile;
+                        }
+                    }
+                    return undefined;
+                }
+                return tile;
+            }
+            const beforePixels = old.data.data;
+            if (pixels.length !== beforePixels.length) {
+                return tile;
+            }
+            for (let i = 0; i < pixels.length; i++) {
+                if (pixels[i] !== beforePixels[i]) {
+                    return tile;
+                }
+            }
+            return undefined;
+        });
+        if (
+            !changedTiles.some((tile) => tile !== undefined) &&
+            composedMask?.enabled === layer.mask.enabled
+        ) {
+            return false;
+        }
+        layer.mask.revision++;
+        const layerMap = createLayerMap(this.layers, { layerId: layer.id, attributes: [] });
+        layerMap[layer.id].mask = {
+            enabled: layer.mask.enabled,
+            tiles: changedTiles,
+        };
+        this.klHistory.push({ layerMap });
+        return true;
+    }
+
     removeLayer(index: number): false | number {
         const toDeleteLayer = this.layers[index];
         if (!toDeleteLayer) {
@@ -642,7 +854,12 @@ export class KlCanvas {
             return false;
         }
         const removed = this.layers.splice(range.start, range.end - range.start + 1);
-        removed.forEach((layer) => BB.freeCanvas(layer.canvas));
+        removed.forEach((layer) => {
+            BB.freeCanvas(layer.canvas);
+            if (layer.mask) {
+                BB.freeCanvas(layer.mask.canvas);
+            }
+        });
         this.updateIndices();
         const activeLayerIndex = this.layers.reduce((bestIndex, layer, layerIndex) => {
             if (isGroupLayer(layer)) {
@@ -872,6 +1089,8 @@ export class KlCanvas {
             !topLayer ||
             isGroupLayer(bottomLayer) ||
             isGroupLayer(topLayer) ||
+            !!bottomLayer.mask ||
+            !!topLayer.mask ||
             (bottomLayer.parentGroupId ?? null) !== (topLayer.parentGroupId ?? null)
         ) {
             return;
@@ -911,7 +1130,7 @@ export class KlCanvas {
     }
 
     mergeAll(): number | false {
-        if (this.layers.length <= 1) {
+        if (this.layers.length <= 1 && !this.layers[0]?.mask) {
             return false;
         }
 
@@ -933,6 +1152,9 @@ export class KlCanvas {
             isPassThrough: false,
         };
         freeCanvas(this.layers[0].canvas);
+        if (this.layers[0].mask) {
+            freeCanvas(this.layers[0].mask.canvas);
+        }
         this.layers[0] = bottomLayer;
 
         this.klHistory.pause(true);
@@ -984,18 +1206,32 @@ export class KlCanvas {
         }
         const ctx = BB.ctx(temp);
         for (let i = 0; i < this.layers.length; i++) {
-            if (isGroupLayer(this.layers[i])) {
-                continue;
+            const layer = this.layers[i];
+            if (!isGroupLayer(layer)) {
+                ctx.clearRect(0, 0, temp.width, temp.height);
+                ctx.save();
+                ctx.setTransform(...matrixToTuple(matrix));
+                ctx.drawImage(layer.canvas, 0, 0);
+                ctx.restore();
+                changeCanvasDimensions(layer.canvas, temp.width, temp.height, {
+                    ensureCleared: true,
+                });
+                layer.context.drawImage(temp, 0, 0);
             }
-            ctx.clearRect(0, 0, temp.width, temp.height);
-            ctx.save();
-            ctx.setTransform(...matrixToTuple(matrix));
-            ctx.drawImage(this.layers[i].canvas, 0, 0);
-            ctx.restore();
-            changeCanvasDimensions(this.layers[i].canvas, temp.width, temp.height, {
-                ensureCleared: true,
-            });
-            this.layers[i].context.drawImage(temp, 0, 0);
+            if (layer.mask) {
+                ctx.save();
+                ctx.setTransform(1, 0, 0, 1, 0, 0);
+                ctx.fillStyle = 'white';
+                ctx.fillRect(0, 0, temp.width, temp.height);
+                ctx.setTransform(...matrixToTuple(matrix));
+                ctx.drawImage(layer.mask.canvas, 0, 0);
+                ctx.restore();
+                changeCanvasDimensions(layer.mask.canvas, temp.width, temp.height, {
+                    ensureCleared: true,
+                });
+                layer.mask.context.drawImage(temp, 0, 0);
+                layer.mask.revision++;
+            }
         }
         this.width = temp.width;
         this.height = temp.height;
@@ -1009,18 +1245,23 @@ export class KlCanvas {
                 width: this.width,
                 height: this.height,
             },
-            layerMap: createLayerMap(this.layers, { attributes: ['tiles'] }),
+            layerMap: createLayerMap(this.layers, { attributes: ['tiles', 'mask'] }),
             ...(this.selection ? { selection: { value: this.selection } } : {}),
         });
+        BB.freeCanvas(temp);
     }
 
     flip(isHorizontal: boolean, isVertical: boolean, layerIndex?: number): void {
         if (!isHorizontal && !isVertical) {
             return;
         }
-        if (layerIndex !== undefined && isGroupLayer(this.layers[layerIndex])) {
+        if (layerIndex !== undefined && !this.layers[layerIndex]) {
             return;
         }
+
+        const range = layerIndex === undefined
+            ? undefined
+            : getSubtreeRange(this.layers, layerIndex);
 
         const temp = BB.canvas(this.width, this.height);
         changeCanvasDimensions(temp, this.width, this.height);
@@ -1033,42 +1274,53 @@ export class KlCanvas {
         );
 
         for (let i = 0; i < this.layers.length; i++) {
-            if (isGroupLayer(this.layers[i])) {
+            if (range && (i < range.start || i > range.end)) {
                 continue;
             }
-            if ((layerIndex || layerIndex === 0) && i !== layerIndex) {
-                continue;
+            const layer = this.layers[i];
+            if (!isGroupLayer(layer)) {
+                tempCtx.save();
+                tempCtx.clearRect(0, 0, temp.width, temp.height);
+                tempCtx.setTransform(...matrixToTuple(matrix));
+                tempCtx.drawImage(layer.canvas, 0, 0);
+                tempCtx.restore();
+
+                layer.context.clearRect(0, 0, layer.canvas.width, layer.canvas.height);
+                layer.context.drawImage(temp, 0, 0);
             }
-
-            tempCtx.save();
-            tempCtx.clearRect(0, 0, temp.width, temp.height);
-            tempCtx.setTransform(...matrixToTuple(matrix));
-            tempCtx.drawImage(this.layers[i].canvas, 0, 0);
-            tempCtx.restore();
-
-            this.layers[i].context.clearRect(
-                0,
-                0,
-                this.layers[i].canvas.width,
-                this.layers[i].canvas.height,
-            );
-            this.layers[i].context.drawImage(temp, 0, 0);
+            if (layer.mask) {
+                tempCtx.save();
+                tempCtx.setTransform(1, 0, 0, 1, 0, 0);
+                tempCtx.fillStyle = 'white';
+                tempCtx.fillRect(0, 0, temp.width, temp.height);
+                tempCtx.setTransform(...matrixToTuple(matrix));
+                tempCtx.drawImage(layer.mask.canvas, 0, 0);
+                tempCtx.restore();
+                layer.mask.context.clearRect(0, 0, this.width, this.height);
+                layer.mask.context.drawImage(temp, 0, 0);
+                layer.mask.revision++;
+            }
         }
 
         if (this.selection) {
             this.selection = transformMultiPolygon(this.selection, matrix);
         }
 
-        const targetLayer = layerIndex === undefined ? undefined : this.layers[layerIndex];
+        const targets = range
+            ? this.layers.slice(range.start, range.end + 1).map((layer) => ({
+                  layerId: layer.id,
+                  attributes: ['tiles', 'mask'] as ('tiles' | 'mask')[],
+              }))
+            : [];
         this.klHistory.push({
             layerMap: createLayerMap(
                 this.layers,
-                targetLayer
-                    ? { layerId: targetLayer.id, attributes: ['tiles'] }
-                    : { attributes: ['tiles'] },
+                range ? { attributes: [] } : { attributes: ['tiles', 'mask'] },
+                ...targets,
             ),
             ...(this.selection ? { selection: { value: this.selection } } : {}),
         });
+        BB.freeCanvas(temp);
     }
 
     // arbitrary drawing operation & focus layer
@@ -1484,6 +1736,13 @@ export class KlCanvas {
                     isExpanded: layer.isExpanded ?? true,
                     isPassThrough: layer.isPassThrough ?? false,
                     image: layer.canvas,
+                    mask: layer.mask
+                        ? {
+                              image: layer.mask.canvas,
+                              enabled: layer.mask.enabled,
+                              revision: layer.mask.revision,
+                          }
+                        : undefined,
                 };
             }),
         };
@@ -1557,6 +1816,9 @@ export class KlCanvas {
         }
         this.layers.forEach((layer) => {
             BB.freeCanvas(layer.canvas);
+            if (layer.mask) {
+                BB.freeCanvas(layer.mask.canvas);
+            }
             layer.canvas = {} as HTMLCanvasElement;
             layer.context = {} as CanvasRenderingContext2D;
         });

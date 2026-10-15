@@ -85,6 +85,13 @@ export const filterBrightnessContrast = {
                     parentGroupId: layers[i].parentGroupId,
                     isExpanded: layers[i].isExpanded,
                     isPassThrough: layers[i].isPassThrough,
+                    mask: layers[i].mask
+                        ? {
+                              image: layers[i].mask!.canvas,
+                              enabled: layers[i].mask!.enabled,
+                              revision: layers[i].mask!.revision,
+                          }
+                        : undefined,
                 });
             }
         }

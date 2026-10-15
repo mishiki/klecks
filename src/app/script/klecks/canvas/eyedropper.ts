@@ -1,7 +1,7 @@
 import { LayerCompositor } from './layer-compositor';
 import { isLayerFill, TRgb } from '../kl-types';
 import { BB } from '../../bb/bb';
-import { THistoryEntryDataComposed } from '../history/history.types';
+import { THistoryEntryDataComposed, THistoryEntryLayerTile } from '../history/history.types';
 import { HISTORY_TILE_SIZE } from '../history/kl-history';
 import { sortLayerMap } from '../history/sort-layer-map';
 
@@ -32,9 +32,27 @@ export class Eyedropper {
         ctx.clearRect(0, 0, 1, 1);
         ctx.imageSmoothingEnabled = false;
 
+        const sample = (tiles: THistoryEntryLayerTile[]): string => {
+            const tile = tiles[tileIndex];
+            if (isLayerFill(tile)) return tile.fill;
+            if (!tile) return 'transparent';
+            const offset = ((y % HISTORY_TILE_SIZE) * tile.data.width + (x % HISTORY_TILE_SIZE)) * 4;
+            return BB.ColorConverter.toRgbaStr({
+                r: tile.data.data[offset], g: tile.data.data[offset + 1],
+                b: tile.data.data[offset + 2], a: tile.data.data[offset + 3] / 255,
+            });
+        };
+        const layers = Object.values(composed.layerMap).sort(sortLayerMap).map((layer) => ({
+            ...layer,
+            mask: layer.mask ? {
+                image: { fill: sample(layer.mask.tiles) },
+                enabled: layer.mask.enabled,
+            } : undefined,
+        }));
+
         this.compositor.draw(
             ctx,
-            Object.values(composed.layerMap).sort(sortLayerMap),
+            layers,
             1,
             1,
             (targetCtx, layer) => {

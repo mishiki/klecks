@@ -108,6 +108,13 @@ export function showImportAsLayerDialog(params: {
                 parentGroupId: klCanvasLayerArr[i].parentGroupId,
                 isExpanded: klCanvasLayerArr[i].isExpanded,
                 isPassThrough: klCanvasLayerArr[i].isPassThrough,
+                mask: klCanvasLayerArr[i].mask
+                    ? {
+                          image: klCanvasLayerArr[i].mask!.canvas,
+                          enabled: klCanvasLayerArr[i].mask!.enabled,
+                          revision: klCanvasLayerArr[i].mask!.revision,
+                      }
+                    : undefined,
             });
         }
     }

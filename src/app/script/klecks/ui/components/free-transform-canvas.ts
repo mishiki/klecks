@@ -81,6 +81,7 @@ export class FreeTransformCanvas {
                 parentGroupId: item.parentGroupId,
                 isExpanded: item.isExpanded,
                 isPassThrough: item.isPassThrough,
+                mask: item.mask,
             };
         });
         this.previewCanvas = BB.canvas(this.imageWidth, this.imageHeight);

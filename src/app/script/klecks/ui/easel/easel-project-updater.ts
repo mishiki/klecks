@@ -70,6 +70,13 @@ export class EaselProjectUpdater<T extends string> {
                     parentGroupId: layer.parentGroupId,
                     isExpanded: layer.isExpanded,
                     isPassThrough: layer.isPassThrough,
+                    mask: layer.mask
+                        ? {
+                              image: layer.mask.canvas,
+                              enabled: layer.mask.enabled,
+                              revision: layer.mask.revision,
+                          }
+                        : undefined,
                 };
             }),
             selection: this.klCanvas.getSelection(),

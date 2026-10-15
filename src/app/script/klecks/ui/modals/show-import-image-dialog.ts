@@ -88,9 +88,9 @@ export function showImportImageDialog(p: {
     let doFlatten = false;
     function showWarnings(psdWarningArr: TKlPsdError[]): void {
         const warningMap = {
-            mask: 'Masks not supported. Mask was applied.',
+            mask: LANG('import-mask-effects-unsupported'),
             group: 'Groups not supported. Layers were ungrouped.',
-            adjustment: 'Adjustment layers not supported.',
+            adjustment: LANG('import-adjustment-placeholder'),
             'layer-effect': 'Layer effects not supported.',
             'smart-object': 'Smart objects not supported.',
             'blend-mode': 'Unsupported layer blend mode.',

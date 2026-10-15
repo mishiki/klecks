@@ -34,6 +34,7 @@ export type TKlStorageProjectRead = {
         isExpanded?: boolean;
         isPassThrough?: boolean;
         blob?: Blob; // png
+        mask?: { blob?: Blob; enabled: boolean; revision?: number };
     }[];
 };
 /**
@@ -58,6 +59,7 @@ export type TKlStorageProjectWrite = {
         isExpanded?: boolean;
         isPassThrough?: boolean;
         blob: Blob; // png
+        mask?: { blob: Blob; enabled: boolean; revision?: number };
     }[];
 };
 
@@ -90,6 +92,17 @@ export class ProjectConverter {
                 // todo image
                 throw new Error('Not implemented');
             }
+            let mask: TKlStorageProjectWrite['layers'][number]['mask'];
+            if (item.mask) {
+                if (!(item.mask.image instanceof HTMLCanvasElement)) {
+                    throw new Error('Mask image is not a canvas');
+                }
+                mask = {
+                    blob: await canvasToBlob(item.mask.image, 'image/png'),
+                    enabled: item.mask.enabled,
+                    revision: item.mask.revision,
+                };
+            }
             layers.push({
                 name: item.name,
                 isVisible: item.isVisible,
@@ -101,6 +114,7 @@ export class ProjectConverter {
                 isExpanded: item.isExpanded,
                 isPassThrough: item.isPassThrough,
                 blob,
+                mask,
             });
         }
 
@@ -166,6 +180,24 @@ export class ProjectConverter {
                 };
             }),
         };
+
+        await Promise.all(
+            project.layers.map(async (layer, index) => {
+                const storedMask = storageProject.layers[index].mask;
+                if (!storedMask) {
+                    return;
+                }
+                if (!storedMask.blob) {
+                    throw new Error('Mask image data missing');
+                }
+                const image = await loadImageFromBlob(storedMask.blob);
+                layer.mask = {
+                    image,
+                    enabled: storedMask.enabled,
+                    revision: storedMask.revision,
+                };
+            }),
+        );
 
         return {
             project: project,

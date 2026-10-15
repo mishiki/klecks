@@ -63,6 +63,14 @@ function createEntryLayer(
             ? createFillColorTiles(projectSize.width, projectSize.height, 'transparent')
             : (tiles ?? canvasToLayerTiles(layer.context.canvas, bounds));
     }
+    if (useAll || attributes.includes('mask')) {
+        result.mask = layer.mask
+            ? {
+                  enabled: layer.mask.enabled,
+                  tiles: canvasToLayerTiles(layer.mask.canvas),
+              }
+            : null;
+    }
     return result;
 }
 
