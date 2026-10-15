@@ -373,6 +373,11 @@ export function newImageDialog(p: {
         textContent: LANG('modal-ok'),
         props: { type: 'submit' },
     });
+    // Modal click handling cancels native button actions, including form submission.
+    createButton.addEventListener('click', (event) => {
+        event.preventDefault();
+        newImDiv.requestSubmit();
+    });
     actionRow.append(cancelButton, createButton);
     newImDiv.append(actionRow);
 
