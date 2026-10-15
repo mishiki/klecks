@@ -26,6 +26,7 @@ export function newImageDialog(p: {
     const newImDiv = BB.el({ tagName: 'form' });
     let ratioSelect: SelectCustom<string> | undefined;
     let ratioOverflow = false;
+    let lastFocusedDimension: 'width' | 'height' = 'width';
     let closeModal: (() => void) | undefined;
     let didConfirm = false;
 
@@ -190,7 +191,8 @@ export function newImageDialog(p: {
                 return;
             }
             const width = readDimension(widthInput);
-            if (width === undefined) {
+            const height = readDimension(heightInput);
+            if (width === undefined && height === undefined) {
                 ratioOverflow = false;
                 ratioError.textContent = LANG('new-size-invalid', {
                     max: String(maxCanvasSize),
@@ -200,10 +202,14 @@ export function newImageDialog(p: {
                 return;
             }
 
-            const height = Math.round(width / preset.ratio);
-            if (!isValidDimension(height)) {
+            const anchor = width === undefined ? 'height' :
+                height === undefined ? 'width' : lastFocusedDimension;
+            const computed = anchor === 'width'
+                ? Math.round(width! / preset.ratio)
+                : Math.round(height! * preset.ratio);
+            if (!isValidDimension(computed)) {
                 ratioOverflow = true;
-                ratioError.textContent = LANG('new-ratio-height-too-large', {
+                ratioError.textContent = LANG('new-ratio-size-invalid', {
                     max: String(maxCanvasSize),
                 });
                 ratioSelect?.setValue(undefined);
@@ -212,7 +218,8 @@ export function newImageDialog(p: {
 
             ratioOverflow = false;
             ratioError.textContent = '';
-            heightInput.valueAsNumber = height;
+            lastFocusedDimension = anchor;
+            (anchor === 'width' ? heightInput : widthInput).valueAsNumber = computed;
             updateDimensionDisplay();
         },
         name: 'image-ratio',
@@ -229,6 +236,8 @@ export function newImageDialog(p: {
     ratioControl.append(ratioLabel, ratioSelectElement, ratioValue);
     templateWrapper.append(ratioControl);
 
+    widthInput.addEventListener('focus', () => { lastFocusedDimension = 'width'; });
+    heightInput.addEventListener('focus', () => { lastFocusedDimension = 'height'; });
     widthInput.addEventListener('input', updateAfterManualDimensionChange);
     heightInput.addEventListener('input', updateAfterManualDimensionChange);
     widthInput.addEventListener('invalid', () => {

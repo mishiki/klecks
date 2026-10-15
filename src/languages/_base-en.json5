@@ -21,7 +21,7 @@ Renaming a key across multiple language files:
   "diagnostics-ready": "Recording stopped. Save the log before reloading.",
   "diagnostics-save": "Save log",
   "diagnostics-stop-save": "● Stop and save log",
-  "new-ratio-height-too-large": "This ratio requires a height above the {max}px maximum. Reduce the width or choose another ratio.",
+  "new-ratio-size-invalid": "The calculated dimension must be between 1 and {max}px. Change the reference size or choose another ratio.",
   "new-size-invalid": "Width and height must be whole numbers from 1 to {max} px.",
 
   "switch-ui-left-right": {

@@ -7,7 +7,7 @@
   "diagnostics-ready": {"original":"Recording stopped. Save the log before reloading.","value":"記録終了。再読み込みする前にログを保存してください。"},
   "diagnostics-save": {"original":"Save log","value":"ログを保存"},
   "diagnostics-stop-save": {"original":"● Stop and save log","value":"● 記録を終了して保存"},
-  "new-ratio-height-too-large": {"original":"This ratio requires a height above the {max}px maximum. Reduce the width or choose another ratio.","value":"この比率では高さが上限の{max}pxを超えます。幅を小さくするか、比率を変更してください。"},
+  "new-ratio-size-invalid": {"original":"The calculated dimension must be between 1 and {max}px. Change the reference size or choose another ratio.","value":"計算結果が1〜{max}pxの範囲外になります。基準の辺の数値か、比率を変更してください。"},
   "new-size-invalid": {"original":"Width and height must be whole numbers from 1 to {max} px.","value":"幅と高さは1〜{max}pxの整数で入力してください。"},
 
   'switch-ui-left-right': {

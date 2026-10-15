@@ -9,7 +9,7 @@ This fork starts with these changes:
 
 Drawing, pen input, and UI behavior are evaluated manually. The layer limit is a cap, not a guarantee that every canvas size fits in device memory.
 
-New Image accepts dimensions up to 8192 × 8192. Its initial width is the rounded screen.width × devicePixelRatio estimate (capped at 8192); the initial image is square. Ratio presets run from landscape through square to portrait and preserve the entered width while calculating the height. Dimensions can also be entered independently.
+New Image accepts dimensions up to 8192 × 8192. Its initial width is the rounded screen.width × devicePixelRatio estimate (capped at 8192); the initial image is square. Ratio presets run from landscape through square to portrait and preserve the last-focused dimension while calculating the other (width by default). If only one dimension is valid, that dimension is used as the reference. Dimensions can also be entered independently.
 
 In Settings, Diagnostics starts a local recording for up to two minutes. Switch back to the brush and reproduce the issue, then use the floating stop/save button. The JSON report contains browser/device capabilities, project dimensions/layer counts, optional JS heap data, pointer events and input decisions, and timing summaries. Image pixels are not included and logs are not uploaded. Recordings are bounded; the report states how many old events were discarded. Save before reloading or starting another recording.
 
