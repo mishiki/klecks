@@ -73,7 +73,8 @@ const FRAGMENT_SHADER = `
     }
     float channel(float b, float s) {
         if (u_mode == 0) return max(0.0, b + s - 1.0);
-        if (u_mode == 1) return min(1.0, b + s);
+        // Add before alpha compositing; clamp only the final color (SAI2 shine).
+        if (u_mode == 1) return b + s;
         if (u_mode == 2) return clamp(b + 2.0 * s - 1.0, 0.0, 1.0);
         if (u_mode == 3) return vivid(b, s);
         if (u_mode == 4) return s < 0.5 ? min(b, 2.0 * s) : max(b, 2.0 * s - 1.0);
@@ -98,7 +99,7 @@ const FRAGMENT_SHADER = `
             (1.0 - asrc) * ab * backdrop.rgb +
             (1.0 - ab) * asrc * source.rgb +
             asrc * ab * blend(backdrop.rgb, source.rgb);
-        gl_FragColor = vec4(premultiplied, a);
+        gl_FragColor = vec4(clamp(premultiplied, vec3(0.0), vec3(a)), a);
     }
 `;
 
@@ -298,7 +299,7 @@ function vivid(base: number, source: number): number {
 function blendChannel(base: number, source: number, mode: TCustomMode): number {
     switch (mode) {
         case 'linear-burn': return Math.max(0, base + source - 1);
-        case 'linear-dodge': return Math.min(1, base + source);
+        case 'linear-dodge': return base + source;
         case 'linear-light': return clamp(base + 2 * source - 1);
         case 'vivid-light': return vivid(base, source);
         case 'pin-light': return source < 0.5 ? Math.min(base, 2 * source) : Math.max(base, 2 * source - 1);
@@ -342,7 +343,7 @@ export function compositeRgba(
             (1 - asrc) * ab * b +
             (1 - ab) * asrc * s +
             asrc * ab * blended;
-        result[index] = (premultiplied / a) * 255;
+        result[index] = clamp(premultiplied / a) * 255;
     }
     result[3] = a * 255;
     return result;
