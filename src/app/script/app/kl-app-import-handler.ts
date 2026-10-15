@@ -451,7 +451,7 @@ export class KlAppImportHandler {
             } else if (fileType === 'psd') {
                 const loaderSizeBytes = 1024 * 1024 * 25; // 25mb
                 const maxSizeBytes = 1024 * 1024 * 1024; // 1gb
-                const maxResolution = 4096;
+                const maxResolution = this.klMaxCanvasSize;
 
                 if (file.size >= maxSizeBytes) {
                     // pretty likely to break stuff
