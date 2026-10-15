@@ -255,6 +255,7 @@ export const filterCropExtend = {
             width: previewWidth,
             height: previewHeight,
             project: {
+                background: klCanvas.getBackground(),
                 width: klCanvas.getWidth(),
                 height: klCanvas.getHeight(),
                 layers: [

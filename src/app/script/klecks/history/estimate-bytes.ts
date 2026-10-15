@@ -14,6 +14,10 @@ export function getFillBytes(fillStr: string): number {
 export function estimateBytes(entry: THistoryEntryData): number {
     let result = 0;
 
+    if (entry.background !== undefined) {
+        result += getFillBytes(entry.background);
+    }
+
     // for complex selection paths
     entry.selection?.value?.forEach((poly) => {
         poly.forEach((ring) => {

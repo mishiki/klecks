@@ -15,6 +15,18 @@
     color: var(--kl-color);
 }
 
+.backgroundControl {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-top: 10px;
+}
+
+.backgroundLabel {
+    font-size: 14px;
+    opacity: 0.8;
+}
+
 :global(.kl-theme-dark) {
     .clippingIndicator {
         color: #ccc;

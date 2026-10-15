@@ -671,6 +671,18 @@
     original: 'New Image',
     value: '新規画像'
   },
+  'canvas-background': {
+    original: 'Canvas background',
+    value: 'キャンバス背景'
+  },
+  'background-white': {
+    original: 'White',
+    value: '白'
+  },
+  'background-transparent': {
+    original: 'Transparent',
+    value: '透明'
+  },
   'new-current': {
     hint: 'as in "reuse the current image resolution"',
     original: 'Current',

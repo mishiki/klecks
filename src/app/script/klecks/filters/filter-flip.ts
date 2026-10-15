@@ -150,6 +150,7 @@ export const filterFlip = {
         const klCanvasPreview = new KlCanvasPreview({
             width: Math.round(w),
             height: Math.round(h),
+            background: klCanvas.getBackground(),
             layers: buildLayers(),
         });
 

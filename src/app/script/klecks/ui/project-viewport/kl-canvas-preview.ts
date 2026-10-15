@@ -1,6 +1,6 @@
 import { BB } from '../../../bb/bb';
 import { LayerCompositor } from '../../canvas/layer-compositor';
-import { TKlBasicLayer } from '../../kl-types';
+import { TCanvasBackground, TKlBasicLayer } from '../../kl-types';
 import { css } from '../../../bb/base/base';
 
 /**
@@ -12,10 +12,17 @@ export class KlCanvasPreview {
     private readonly ctx: CanvasRenderingContext2D | null;
     private readonly compositor = new LayerCompositor();
     private layers: TKlBasicLayer[];
+    private readonly background: TCanvasBackground | undefined;
 
     // ----------------------------------- public -----------------------------------
-    constructor(p: { width: number; height: number; layers: TKlBasicLayer[] }) {
+    constructor(p: {
+        width: number;
+        height: number;
+        layers: TKlBasicLayer[];
+        background?: TCanvasBackground;
+    }) {
         this.layers = p.layers;
+        this.background = p.background;
 
         const scale = p.width / p.layers[0].image.width;
         const width = scale > 1 ? p.layers[0].image.width : p.width;
@@ -52,6 +59,10 @@ export class KlCanvasPreview {
 
         ctx.save();
         ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
+        if (this.background === 'white') {
+            ctx.fillStyle = '#fff';
+            ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+        }
         this.compositor.draw(
             ctx,
             this.layers,

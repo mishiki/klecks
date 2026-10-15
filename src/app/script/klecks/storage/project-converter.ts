@@ -1,4 +1,5 @@
 import {
+    TCanvasBackground,
     TDeserializedKlStorageProject,
     TKlProject,
     TKlProjectMeta,
@@ -16,6 +17,8 @@ import { loadImageFromBlob } from '../../bb/base/load-image';
 export type TKlStorageProjectRead = {
     id: 1;
     projectId: string;
+    // Missing means transparent for projects saved before document backgrounds were added.
+    background?: TCanvasBackground;
     timestamp: number;
     thumbnail: Blob; // png
     width: number; // int
@@ -35,6 +38,7 @@ export type TKlStorageProjectRead = {
 export type TKlStorageProjectWrite = {
     id: 1;
     projectId: string;
+    background: TCanvasBackground;
     timestamp: number;
     thumbnail: Blob; // png
     width: number; // int
@@ -65,7 +69,7 @@ export class ProjectConverter {
             PROJECT_STORE_THUMBNAIL_SIZE_PX,
         );
         const factor = size.width / project.width;
-        return drawProject(project, factor);
+        return drawProject(project, factor, undefined, true);
     }
 
     static async createStorageProject(project: TKlProject): Promise<TKlStorageProjectWrite> {
@@ -91,6 +95,7 @@ export class ProjectConverter {
         return {
             id: 1,
             projectId: project.projectId,
+            background: project.background ?? 'transparent',
             timestamp: Date.now(),
             thumbnail: await canvasToBlob(ProjectConverter.createThumbnail(project), 'image/png'),
             width: project.width,
@@ -119,6 +124,7 @@ export class ProjectConverter {
         }
         const project: TKlProject = {
             projectId: storageProject.projectId,
+            background: storageProject.background ?? 'transparent',
             width: storageProject.width,
             height: storageProject.height,
             layers: (

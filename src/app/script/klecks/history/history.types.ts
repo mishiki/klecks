@@ -1,5 +1,5 @@
 import { MultiPolygon } from 'polygon-clipping';
-import { TLayerFill, TMixMode } from '../kl-types';
+import { TCanvasBackground, TLayerFill, TMixMode } from '../kl-types';
 
 export type TLayerId = string;
 export type TImageDataTile = {
@@ -38,6 +38,9 @@ export type THistoryEntryLayer = {
     tiles?: (THistoryEntryLayerTile | undefined)[]; // undefined if tile did not change
 };
 export type THistoryEntryData = {
+    // if document background changed
+    background?: TCanvasBackground;
+
     // if project changed
     projectId?: {
         value: string; // uuid

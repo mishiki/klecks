@@ -1,3 +1,18 @@
+# Personal Klecks fork
+
+This fork starts with these changes:
+- Up to 255 paint layers.
+- New documents start with a transparent paint layer and a separate white background.
+- White/transparent background selection in New Image and below the layer list.
+- Background state follows undo/redo, browser storage, recovery, and image exports.
+- PSD exports represent white paper as a marked bottom layer for other readers. This fork restores unchanged marked paper as document background when reopening the PSD. Edited or unmarked paper remains an ordinary layer.
+
+Drawing, pen input, and UI behavior are evaluated manually. The layer limit is a cap, not a guarantee that every canvas size fits in device memory.
+
+Build and launch commands are listed below. Layer folders, magic wand, and SAI2 import/export are not part of this initial change.
+
+---
+
 <div align="center">
  <img src="https://bitbof.com/stuff/2022-01-klecks/2026-04-06-logo.png" alt="Klecks" title="Klecks">
 </div>

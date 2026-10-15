@@ -534,6 +534,7 @@ export const filterTransform = {
             width: getPreviewWidth(isSmall),
             height: getPreviewHeight(isSmall),
             project: {
+                background: klCanvas.getBackground(),
                 width: context.canvas.width,
                 height: context.canvas.height,
                 layers: previewLayerArr,

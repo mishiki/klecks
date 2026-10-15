@@ -30,7 +30,7 @@ export const filterResize = {
             h = parseInt('' + fit.height);
 
         let previewFactor = w / klCanvas.getWidth();
-        const tempCanvas = klCanvas.getCanvas();
+        const tempCanvas = klCanvas.getCanvas(1, undefined, true);
 
         const rootEl = BB.el();
         const result: TFilterGetDialogResult<TFilterResizeInput> = {

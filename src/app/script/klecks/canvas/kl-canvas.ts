@@ -10,6 +10,7 @@ import {
     TGradient,
     TInterpolationAlgorithm,
     TKlNamedLayer,
+    TCanvasBackground,
     TKlProject,
     TMixMode,
     TRgb,
@@ -48,7 +49,7 @@ import { TIndexBounds } from '../../bb/bb-types';
 import { LayerCompositor } from './layer-compositor';
 import { getMixModeStr } from './get-mix-mode';
 
-export const MAX_LAYERS = 16;
+export const MAX_LAYERS = 255;
 
 export type TKlCanvasLayer = {
     id: TLayerId;
@@ -77,6 +78,7 @@ export class KlCanvas {
     private isDestroyed = false;
     private width: number;
     private height: number;
+    private background: TCanvasBackground = 'transparent';
     private layers: TKlCanvasLayer[];
     private eyedropper: Eyedropper;
     private selection: undefined | MultiPolygon = undefined;
@@ -105,6 +107,7 @@ export class KlCanvas {
                 size: { width: 0, height: 0 },
                 activeLayerId: '',
                 selection: { value: [] },
+                background: 'transparent',
                 layerMap: {},
             },
             this.klHistory.getComposed(),
@@ -120,6 +123,7 @@ export class KlCanvas {
         projectId?: string; // uuid
         width: number;
         height: number;
+        background?: TCanvasBackground; // missing means transparent
         color?: TRgb; // optional - fill color
         image?: HTMLImageElement | HTMLCanvasElement; // image drawn on layer
         layerName?: string; // if via image
@@ -139,6 +143,7 @@ export class KlCanvas {
         }
         this.width = p.width;
         this.height = p.height;
+        this.background = p.background ?? 'transparent';
         this.selection = undefined;
         this.layers.splice(1, Math.max(0, this.layers.length - 1));
 
@@ -193,6 +198,7 @@ export class KlCanvas {
                     height: this.height,
                 },
                 selection: { value: this.selection },
+                background: this.background,
                 activeLayerId: this.layers.at(-1)!.id,
                 layerMap: createLayerMap(this.layers, {
                     attributes: 'all',
@@ -214,6 +220,18 @@ export class KlCanvas {
 
     getHeight(): number {
         return this.height;
+    }
+
+    getBackground(): TCanvasBackground {
+        return this.background;
+    }
+
+    setBackground(background: TCanvasBackground): void {
+        if (background === this.background) {
+            return;
+        }
+        this.background = background;
+        this.klHistory.push({ background });
     }
 
     /**
@@ -673,6 +691,7 @@ export class KlCanvas {
             return false;
         }
 
+        // Merge paint only; document background remains separate.
         const mergedCanvas = drawProject(this.getProject());
         const bottomLayer: TKlCanvasLayer = {
             id: this.layers[0].id,
@@ -1176,13 +1195,23 @@ export class KlCanvas {
         return result;
     }
 
-    getCanvas(factor: number = 1, masksSelection?: boolean): HTMLCanvasElement {
-        return drawProject(this.getProject(), factor, masksSelection ? this.selection : undefined);
+    getCanvas(
+        factor: number = 1,
+        masksSelection?: boolean,
+        includeBackground: boolean = false,
+    ): HTMLCanvasElement {
+        return drawProject(
+            this.getProject(),
+            factor,
+            masksSelection ? this.selection : undefined,
+            includeBackground,
+        );
     }
 
     getProject(): TKlProject {
         return {
             projectId: this.klHistory.getComposed().projectId.value,
+            background: this.background,
             width: this.width,
             height: this.height,
             layers: this.layers.map((layer) => {
@@ -1252,6 +1281,7 @@ export class KlCanvas {
     updateViaComposed(before: THistoryEntryDataComposed, after: THistoryEntryDataComposed): void {
         this.width = after.size.width;
         this.height = after.size.height;
+        this.background = after.background ?? 'transparent';
         this.selection = after.selection.value;
         this.layers = updateLayersViaComposed(this.layers, before, after);
     }

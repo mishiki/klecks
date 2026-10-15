@@ -1,3 +1,4 @@
+import { hasUnchangedPsdBackground } from './psd-background';
 import { createCanvas } from '../../bb/base/create-canvas';
 import { BlendMode, Layer, Psd } from 'ag-psd/dist/psd';
 import { TKlProject, TKlPsd, TKlPsdError, TKlPsdLayer, TMixMode } from '../kl-types';
@@ -88,6 +89,11 @@ export function psdToKlPsd(psdObj: Psd): TKlPsd {
     if (!psdObj.children) {
         result.error = true;
         return result;
+    }
+
+    if (hasUnchangedPsdBackground(psdObj)) {
+        result.background = 'white';
+        psdObj = { ...psdObj, children: psdObj.children.slice(1) };
     }
 
     // count resulting layers
@@ -340,6 +346,7 @@ export function klPsdToKlProject(klPsd: TKlPsd): TKlProject {
         width: klPsd.width,
         height: klPsd.height,
         layers: [],
+        background: klPsd.layers ? (klPsd.background ?? 'transparent') : 'transparent',
     };
     if (klPsd.layers) {
         result.layers = klPsd.layers.map((item) => {

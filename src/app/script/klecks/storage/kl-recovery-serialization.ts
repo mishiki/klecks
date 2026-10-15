@@ -83,6 +83,7 @@ export function serializeRecovery(
     return {
         recovery: {
             projectId: composed.projectId.value,
+            background: composed.background,
             width: composed.size.width,
             height: composed.size.height,
             timestamp: Date.now(),
@@ -194,6 +195,7 @@ export async function deserializeRecovery(
     return {
         project: {
             projectId: readResult.recovery.projectId ?? randomUuid(),
+            background: readResult.recovery.background ?? 'transparent',
             width: readResult.recovery.width,
             height: readResult.recovery.height,
             layers,

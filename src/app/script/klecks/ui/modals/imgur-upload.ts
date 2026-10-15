@@ -204,7 +204,7 @@ export function imgurUpload(
             tileInput.destroy();
             if (val === 'submit') {
                 const result = await upload(
-                    klCanvas.getCanvas(),
+                    klCanvas.getCanvas(1, false, true),
                     title,
                     descriptionInput.value,
                     typeRadio.getValue() as 'png' | 'jpeg',

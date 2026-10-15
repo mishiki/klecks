@@ -46,6 +46,7 @@ export function projectToComposed(project: TKlProject): THistoryEntryDataCompose
         }),
     );
     return {
+        background: project.background ?? 'transparent',
         projectId: {
             value: project.projectId,
         },

@@ -43,6 +43,7 @@ export class EaselProjectUpdater<T extends string> {
         }
         const compositeCanvas = this.compositeCanvas;
         this.easel.setProject({
+            background: this.klCanvas.getBackground(),
             width,
             height,
             layers: layers.map((layer) => {

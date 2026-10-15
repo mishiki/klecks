@@ -62,7 +62,6 @@ import { MobileUi } from '../klecks/ui/mobile/mobile-ui';
 import { MobileToolUi } from '../klecks/ui/mobile/mobile-tool-ui';
 import { canvasToBlob } from '../bb/base/canvas';
 import { projectToComposed } from '../klecks/history/push-helpers/project-to-composed';
-import { ERASE_COLOR } from '../klecks/brushes/erase-color';
 import { KlRecoveryManager } from '../klecks/storage/kl-recovery-manager';
 import { UnloadWarningTrigger } from '../klecks/ui/components/unload-warning-trigger';
 import { KL_INDEXED_DB } from '../klecks/storage/kl-indexed-db';
@@ -319,6 +318,7 @@ export class KlApp {
                     projectId: randomUuid(),
                     width: initialWidth,
                     height: initialHeight,
+                    background: 'white',
                     layers: [
                         {
                             name: LANG('layers-layer') + ' 1', // not ideal
@@ -327,11 +327,7 @@ export class KlApp {
                             mixModeStr: 'source-over',
                             hasClipping: false,
                             image: {
-                                fill: BB.ColorConverter.toRgbStr({
-                                    r: ERASE_COLOR,
-                                    g: ERASE_COLOR,
-                                    b: ERASE_COLOR,
-                                }),
+                                fill: 'transparent',
                             },
                         },
                     ],
@@ -341,7 +337,9 @@ export class KlApp {
         const klRecoveryManager = p.klRecoveryManager;
         if (klRecoveryManager) {
             klRecoveryManager.setKlHistory(this.klHistory);
-            klRecoveryManager.setGetThumbnail((factor) => this.klCanvas.getCanvas(factor));
+            klRecoveryManager.setGetThumbnail((factor) =>
+                this.klCanvas.getCanvas(factor, false, true),
+            );
         }
         if (p.project) {
             // attempt at freeing memory
@@ -1702,8 +1700,6 @@ export class KlApp {
         const showNewImageDialog = () => {
             applyUncommitted();
             KL.newImageDialog({
-                currentColor: currentColor,
-                secondaryColor: this.klColorSlider.getSecondaryRGB(),
                 maxCanvasSize,
                 canvasWidth: this.klCanvas.getWidth(),
                 canvasHeight: this.klCanvas.getHeight(),
@@ -1712,11 +1708,11 @@ export class KlApp {
                         ? this.uiWidth
                         : this.uiWidth - this.toolWidth,
                 workspaceHeight: this.uiHeight,
-                onConfirm: (width, height, color) => {
+                onConfirm: (width, height, background) => {
                     this.klCanvas.reset({
                         width: width,
                         height: height,
-                        color: color.a === 1 ? color : undefined,
+                        background,
                     });
 
                     this.layersUi.update(0);
@@ -1731,7 +1727,7 @@ export class KlApp {
         const shareImage = (callback?: () => void) => {
             applyUncommitted();
             BB.shareCanvas({
-                canvas: this.klCanvas.getCanvas(),
+                canvas: this.klCanvas.getCanvas(1, false, true),
                 fileName: getFilenameDate() + KL_CONFIG.filenameBase + '.png',
                 title: getFilenameDate() + KL_CONFIG.filenameBase + '.png',
                 callback: callback ? callback : () => {},
@@ -1855,6 +1851,7 @@ export class KlApp {
                 projectId: project.project.projectId,
                 width: project.project.width,
                 height: project.project.height,
+                background: project.project.background ?? 'transparent',
                 layers: project.project.layers.map((item) => {
                     let image = item.image;
                     if (!(image instanceof HTMLCanvasElement)) {
@@ -2362,7 +2359,7 @@ export class KlApp {
     }
 
     async getPNG(): Promise<Blob> {
-        return await canvasToBlob(this.klCanvas.getCanvas(), 'image/png');
+        return await canvasToBlob(this.klCanvas.getCanvas(1, false, true), 'image/png');
     }
 
     getPSD = async (): Promise<Blob> => {

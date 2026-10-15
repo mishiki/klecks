@@ -99,7 +99,11 @@ export type TKlProjectLayer = TKlNamedLayer<
 // If they're not equal, it's possible to show the user a warning.
 export type TProjectId = string;
 
+export type TCanvasBackground = 'white' | 'transparent';
+
 export type TKlProject = {
+    // Missing means transparent for legacy projects and imports.
+    background?: TCanvasBackground;
     width: number; // int
     height: number; // int
     layers: TKlProjectLayer[];
@@ -307,6 +311,7 @@ export type TKlPsdLayer = TKlNamedLayer<HTMLCanvasElement>;
  */
 export type TKlPsd = {
     type: 'psd';
+    background?: TCanvasBackground;
     canvas: HTMLCanvasElement;
     width: number;
     height: number;

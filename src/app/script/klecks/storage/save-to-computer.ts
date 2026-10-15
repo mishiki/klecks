@@ -54,7 +54,7 @@ export class SaveToComputer {
             result = await saveAs(
                 `${fileBase}.${format}`,
                 mimeType,
-                () => canvasToBlob(this.klCanvas.getCanvas(), mimeType),
+                () => canvasToBlob(this.klCanvas.getCanvas(1, false, true), mimeType),
                 this.showsSaveDialog,
             );
         }

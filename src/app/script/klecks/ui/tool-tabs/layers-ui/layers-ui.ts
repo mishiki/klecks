@@ -4,7 +4,7 @@ import { changeCanvasDimensions } from '../../../../bb/base/change-canvas-dimens
 import { SelectCustom } from '../../components/select-custom';
 import { PointSlider } from '../../components/point-slider';
 import { KlCanvas, MAX_LAYERS } from '../../../canvas/kl-canvas';
-import { TMixMode } from '../../../kl-types';
+import { TCanvasBackground, TMixMode } from '../../../kl-types';
 import { LANG } from '../../../../language/language';
 import { translateBlending } from '../../../canvas/translate-blending';
 import { PointerListener } from '../../../../bb/input/pointer-listener';
@@ -19,6 +19,7 @@ import { KlHistory } from '../../../history/kl-history';
 import * as classes from './layers-ui.module.scss';
 import { BoxToggle } from '../../components/box-toggle';
 import { FloatingLayerPreview } from '../../components/floating-layer-preview';
+import { Options } from '../../components/options';
 
 const paddingLeft = 25;
 
@@ -77,6 +78,7 @@ export class LayersUi {
     private readonly moreDropdown: DropdownMenu<'clear-layer' | 'advanced-merge' | 'merge-all'>;
     private readonly modeSelect: SelectCustom<TMixMode>;
     private readonly clippingToggle: BoxToggle;
+    private readonly backgroundOptions: Options<TCanvasBackground>;
     private oldHistoryState: number | undefined;
     private isManipulating: boolean = false;
 
@@ -558,6 +560,28 @@ export class LayersUi {
 
         this.klCanvasLayerArr = this.klCanvas.getLayers();
         this.selectedSpotIndex = this.klCanvasLayerArr.length - 1;
+        this.backgroundOptions = new Options<TCanvasBackground>({
+            optionArr: [
+                {
+                    id: 'white',
+                    label: LANG('background-white'),
+                    ariaLabel: LANG('background-white'),
+                },
+                {
+                    id: 'transparent',
+                    label: LANG('background-transparent'),
+                    ariaLabel: LANG('background-transparent'),
+                },
+            ],
+            initId: this.klCanvas.getBackground(),
+            ariaLabel: LANG('canvas-background'),
+            isFocusable: true,
+            onChange: (background) => {
+                this.applyUncommitted();
+                this.klCanvas.setBackground(background);
+                this.onUpdateProject();
+            },
+        });
         this.rootEl = BB.el({
             css: {
                 marginRight: 10,
@@ -803,8 +827,20 @@ export class LayersUi {
         }
 
         this.rootEl.append(listDiv);
+        const backgroundControl = BB.el({
+            className: classes.backgroundControl,
+            content: [
+                BB.el({
+                    textContent: LANG('canvas-background'),
+                    className: classes.backgroundLabel,
+                }),
+                this.backgroundOptions.getElement(),
+            ],
+        });
+        this.rootEl.append(backgroundControl);
 
         this.klHistory.addListener(() => {
+            this.backgroundOptions.setValue(this.klCanvas.getBackground(), true);
             if (this.rootEl.style.display !== 'block') {
                 return;
             }
@@ -816,6 +852,7 @@ export class LayersUi {
 
     // ---- interface ----
     update(activeLayerSpotIndex?: number): void {
+        this.backgroundOptions.setValue(this.klCanvas.getBackground(), true);
         this.klCanvasLayerArr = this.klCanvas.getLayers();
         if (activeLayerSpotIndex || activeLayerSpotIndex === 0) {
             this.selectedSpotIndex = activeLayerSpotIndex;

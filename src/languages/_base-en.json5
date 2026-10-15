@@ -450,6 +450,9 @@ Renaming a key across multiple language files:
   "filled-selected-area": 'Filled selection',
 
   "new-title": "New Image",
+  "canvas-background": "Canvas background",
+  "background-white": "White",
+  "background-transparent": "Transparent",
   "new-current": {
     "hint": "as in \"reuse the current image resolution\"",
     "value": "Current"

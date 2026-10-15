@@ -1,3 +1,4 @@
+import { addPsdBackground } from './psd-background';
 import { KlCanvas } from '../canvas/kl-canvas';
 import type { Psd } from 'ag-psd/dist/psd';
 import { blendKlToPsd } from './psd';
@@ -13,7 +14,7 @@ export async function klCanvasToPsdBlob(
     let canvas: HTMLCanvasElement | undefined;
     if (isPreviewIncluded) {
         // makes saving less likely to fail
-        const c = attempt(() => klCanvas.getCanvas());
+        const c = attempt(() => klCanvas.getCanvas(1, false, true));
         if (!(c instanceof AttemptError)) {
             canvas = c;
         }
@@ -38,5 +39,8 @@ export async function klCanvasToPsdBlob(
         }),
     };
 
+    if (klCanvas.getBackground() === 'white') {
+        addPsdBackground(psdConfig);
+    }
     return await psdToBlob(psdConfig);
 }

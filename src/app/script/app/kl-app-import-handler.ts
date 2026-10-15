@@ -157,6 +157,7 @@ export class KlAppImportHandler {
                 layerIndex = this.klCanvas.reset({
                     width: convertedPsdObj.width,
                     height: convertedPsdObj.height,
+                    background: convertedPsdObj.background ?? 'transparent',
                     layers: convertedPsdObj.layers.map((layer) => {
                         return {
                             id: getNextLayerId(),

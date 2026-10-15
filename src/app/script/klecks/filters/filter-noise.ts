@@ -488,6 +488,7 @@ export const filterNoise = {
             width: getPreviewWidth(isSmall),
             height: getPreviewHeight(isSmall),
             project: {
+                background: klCanvas.getBackground(),
                 width: layer.canvas.width,
                 height: layer.canvas.height,
                 layers: previewLayerArr,

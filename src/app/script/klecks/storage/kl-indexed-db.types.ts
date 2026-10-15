@@ -11,6 +11,8 @@
  *          Write - what is allowed to be written to that store
  *          <Other> - common types used by that store
  */
+import type { TCanvasBackground } from '../kl-types';
+
 export type TIdb = {
     // v1 - archived
     V1: {
@@ -90,6 +92,8 @@ export type TIdb = {
                 id: 1;
                 // may not exist pre 0.9. not tabId.
                 projectId?: TIdb['V2']['Common']['Uuid'];
+                // Missing means transparent for projects saved before document backgrounds were added.
+                background?: TCanvasBackground;
                 // unix timestamp when updated
                 timestamp: number;
                 // added with 0.5.1
@@ -117,6 +121,7 @@ export type TIdb = {
             Write: {
                 id: 1;
                 projectId: TIdb['V2']['Common']['Uuid'];
+                background: TCanvasBackground;
                 // unix timestamp when updated
                 timestamp: number;
                 thumbnail: TIdb['V2']['ProjectStore']['ImageDataRef'];
@@ -148,6 +153,8 @@ export type TIdb = {
             Read: {
                 // not the tab id. added during 0.9 beta
                 projectId?: TIdb['V2']['Common']['Uuid'];
+                // Missing means transparent for recovery data saved before document backgrounds were added.
+                background?: TCanvasBackground;
                 // int
                 width: number;
                 // int
@@ -174,6 +181,7 @@ export type TIdb = {
             Write: {
                 // not the tab id.
                 projectId: TIdb['V2']['Common']['Uuid'];
+                background: TCanvasBackground;
                 // int
                 width: number;
                 // int

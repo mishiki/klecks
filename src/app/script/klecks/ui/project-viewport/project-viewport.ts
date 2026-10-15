@@ -1,5 +1,5 @@
 import { LayerCompositor } from '../../canvas/layer-compositor';
-import { TKlLayer } from '../../kl-types';
+import { TCanvasBackground, TKlLayer } from '../../kl-types';
 import { BB } from '../../../bb/bb';
 import { changeCanvasDimensions } from '../../../bb/base/change-canvas-dimensions';
 import { css } from '../../../bb/base/base';
@@ -31,6 +31,7 @@ export type TProjectViewportProject = {
     width: number;
     height: number;
     layers: TProjectViewportLayer[];
+    background?: TCanvasBackground;
 };
 
 type TRenderedImage = { image: CanvasImageSource; transform?: Matrix };
@@ -229,6 +230,10 @@ export class ProjectViewport {
 
             // checkerboard
             this.ctx.clearRect(0, 0, this.project.width, this.project.height);
+            if (this.project.background === 'white') {
+                this.ctx.fillStyle = '#fff';
+                this.ctx.fillRect(0, 0, this.project.width, this.project.height);
+            }
 
             this.ctx.restore();
         }

@@ -1,9 +1,9 @@
 import { BB } from '../../../bb/bb';
 import { SelectCustom } from '../components/select-custom';
-import { ColorOptions } from '../components/color-options';
+import { Options } from '../components/options';
 import { showModal } from './base/show-modal';
 import { LANG } from '../../../language/language';
-import { TRgb, TRgba } from '../../kl-types';
+import { TCanvasBackground } from '../../kl-types';
 import { TSize2D } from '../../../bb/bb-types';
 import { table } from '../components/table';
 import { css } from '../../../bb/base/base';
@@ -11,18 +11,14 @@ import { Input } from '../components/input';
 import { Destroyer } from '../../../bb/base/base';
 
 export function newImageDialog(p: {
-    currentColor: TRgb; // current color
-    secondaryColor: TRgb;
     maxCanvasSize: number;
     canvasWidth: number; // current canvas size
     canvasHeight: number; // current canvas size
     workspaceWidth: number;
     workspaceHeight: number;
-    onConfirm: (width: number, height: number, color: TRgba) => void;
+    onConfirm: (width: number, height: number, background: TCanvasBackground) => void;
     onCancel: () => void;
 }): void {
-    const currentColor = p.currentColor;
-    const secondaryColor = p.secondaryColor;
     const maxCanvasSize = p.maxCanvasSize;
     const canvasWidth = p.canvasWidth;
     const canvasHeight = p.canvasHeight;
@@ -263,43 +259,7 @@ export function newImageDialog(p: {
     });
     templateWrapper.append(select.getElement());
 
-    let backgroundRgba = { r: 255, g: 255, b: 255, a: 1 };
-
-    const colorOptionsArr = [
-        { r: 255, g: 255, b: 255, a: 1 },
-        { r: 0, g: 0, b: 0, a: 1 },
-        { r: 0, g: 0, b: 0, a: 0 },
-        {
-            r: currentColor.r,
-            g: currentColor.g,
-            b: currentColor.b,
-            a: 1,
-        },
-        {
-            r: secondaryColor.r,
-            g: secondaryColor.g,
-            b: secondaryColor.b,
-            a: 1,
-        },
-    ];
-
-    const colorOptions = new ColorOptions({
-        colorArr: colorOptionsArr,
-        initialIndex: 0,
-        onChange: function (rgbaObj): void {
-            backgroundRgba = rgbaObj!;
-            preview.style.backgroundColor =
-                'rgba(' +
-                rgbaObj!.r +
-                ',' +
-                rgbaObj!.g +
-                ',' +
-                rgbaObj!.b +
-                ', ' +
-                rgbaObj!.a +
-                ')';
-        },
-    });
+    let background: TCanvasBackground = 'white';
 
     const previewWrapper = BB.el({
         className: 'kl-transparent-preview',
@@ -319,16 +279,7 @@ export function newImageDialog(p: {
         css: {
             width: 200,
             height: 100,
-            backgroundColor:
-                'rgba(' +
-                backgroundRgba.r +
-                ',' +
-                backgroundRgba.g +
-                ',' +
-                backgroundRgba.b +
-                ', ' +
-                backgroundRgba.a +
-                ')',
+            backgroundColor: 'white',
             marginLeft: 'auto',
             marginRight: 'auto',
             color: '#aaa',
@@ -340,6 +291,28 @@ export function newImageDialog(p: {
             overflow: 'hidden',
         },
     });
+    const backgroundOptions = new Options<TCanvasBackground>({
+        optionArr: [
+            {
+                id: 'white',
+                label: LANG('background-white'),
+                ariaLabel: LANG('background-white'),
+            },
+            {
+                id: 'transparent',
+                label: LANG('background-transparent'),
+                ariaLabel: LANG('background-transparent'),
+            },
+        ],
+        initId: background,
+        ariaLabel: LANG('canvas-background'),
+        isFocusable: true,
+        onChange: (value) => {
+            background = value;
+            preview.style.backgroundColor = value === 'white' ? 'white' : 'transparent';
+        },
+    });
+
     BB.el({
         parent: previewWrapper,
         content: preview,
@@ -454,7 +427,21 @@ export function newImageDialog(p: {
         parent: secondRow,
     });
     secondRowLeft.append(sizeTable, ratioWrapper);
-    secondRow.append(colorOptions.getElement());
+    const backgroundControl = BB.el({
+        css: {
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'flex-start',
+            gap: 4,
+        },
+    });
+    BB.el({
+        parent: backgroundControl,
+        textContent: LANG('canvas-background'),
+        css: { fontSize: 13 },
+    });
+    backgroundControl.append(backgroundOptions.getElement());
+    secondRow.append(backgroundControl);
 
     newImDiv.append(previewWrapper);
 
@@ -465,7 +452,7 @@ export function newImageDialog(p: {
         callback: function (result) {
             destroyer.destroy();
             select.destroy();
-            colorOptions.destroy();
+            backgroundOptions.destroy();
             widthInput.destroy();
             heightInput.destroy();
 
@@ -473,7 +460,7 @@ export function newImageDialog(p: {
                 onCancel();
                 return;
             }
-            onConfirm(widthInput.getValue(), heightInput.getValue(), backgroundRgba);
+            onConfirm(widthInput.getValue(), heightInput.getValue(), background);
         },
         clickOnEnter: 'Ok',
     });

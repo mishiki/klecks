@@ -50,15 +50,20 @@ export class KlHistory {
 
     // ----------------------------------- public -----------------------------------
     constructor(p: TKlHistoryParams) {
-        validateHistoryEntry(p.oldest, p.oldest.size);
+        // Recovery data written before document backgrounds existed defaults to transparent.
+        const oldest: THistoryEntryDataComposed = {
+            ...p.oldest,
+            background: p.oldest.background ?? 'transparent',
+        };
+        validateHistoryEntry(oldest, oldest.size);
         this.entries = [
             {
                 timestamp: Date.now(),
-                memoryEstimateBytes: estimateBytes(p.oldest),
-                data: p.oldest,
+                memoryEstimateBytes: estimateBytes(oldest),
+                data: oldest,
             },
         ];
-        this.composed = p.oldest;
+        this.composed = oldest;
         if (HISTORY_DEBUGGING) {
             (window as any).getHistoryEntries = () => this.entries;
         }

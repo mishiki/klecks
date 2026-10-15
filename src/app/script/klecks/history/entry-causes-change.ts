@@ -5,6 +5,9 @@ export function entryCausesChange(
     entry: THistoryEntryData,
     composed: THistoryEntryDataComposed,
 ): boolean {
+    if (entry.background !== undefined && entry.background !== composed.background) {
+        return true;
+    }
     if (entry.size !== undefined) {
         if (entry.size.width !== composed.size.width) {
             return true;

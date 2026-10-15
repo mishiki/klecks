@@ -24,7 +24,7 @@ function getLatestDefinedProp<
     GProp extends string,
     GValue,
     GArray extends { [K in GProp]?: GValue },
->(array: (GArray | undefined)[], prop: GProp): GValue {
+>(array: (GArray | undefined)[], prop: GProp, defaultValue?: GValue): GValue {
     for (let i = array.length - 1; i >= 0; i--) {
         if (!array[i]) {
             continue;
@@ -33,6 +33,9 @@ function getLatestDefinedProp<
         if (value !== undefined) {
             return value;
         }
+    }
+    if (defaultValue !== undefined) {
+        return defaultValue;
     }
     throw new Error('no defined entry found');
 }
@@ -91,6 +94,7 @@ export function composeHistoryStateData(
     }
     entries = entries.slice(0, targetIndex + 1);
     return {
+        background: getLatestDefinedProp(entries, 'background', 'transparent' as THistoryEntryDataComposed['background']),
         projectId: getLatestDefinedProp(entries, 'projectId'),
         size: getLatestDefinedProp(entries, 'size'),
         activeLayerId: getLatestDefinedProp(entries, 'activeLayerId'),

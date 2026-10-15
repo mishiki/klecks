@@ -9,6 +9,14 @@ export function validateHistoryEntry(
     entryData: THistoryEntryData,
     previousSize: { width: number; height: number },
 ): void {
+    if (
+        entryData.background !== undefined &&
+        entryData.background !== 'white' &&
+        entryData.background !== 'transparent'
+    ) {
+        asyncThrow(new Error('[KlHistory] Invalid background value'));
+        return;
+    }
     const size = entryData.size ?? previousSize;
     const tilesX = Math.ceil(size.width / HISTORY_TILE_SIZE);
     const tilesY = Math.ceil(size.height / HISTORY_TILE_SIZE);

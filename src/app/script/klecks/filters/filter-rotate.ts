@@ -21,7 +21,7 @@ export const filterRotate = {
         const previewFactor = w / klCanvas.getWidth();
         const tempCanvas = BB.canvas(w, h);
         tempCanvas.style.display = 'block';
-        BB.ctx(tempCanvas).drawImage(klCanvas.getCanvas(previewFactor), 0, 0, w, h);
+        BB.ctx(tempCanvas).drawImage(klCanvas.getCanvas(previewFactor, undefined, true), 0, 0, w, h);
 
         const rootEl = BB.el();
         const destroyer = new Destroyer();
