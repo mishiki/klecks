@@ -1,3 +1,4 @@
+import { DIAGNOSTICS } from '../bb/diagnostics/diagnostics';
 import { getIconUrl } from '../icon/icon';
 import { KL } from '../klecks/kl';
 import { TBrushId } from '../klecks/brushes-ui/brushes-ui';
@@ -272,12 +273,7 @@ export class KlApp {
         setupUnfocusOnClickService();
         this.embed = p.embed;
         this.helpPath = p.helpPath ?? 'help.html';
-        // default 2048, unless your screen is bigger than that (that computer then probably has the horsepower for that)
-        // but not larger than 4096 - a fairly arbitrary decision
-        const maxCanvasSize = Math.min(
-            4096,
-            Math.max(2048, Math.max(window.screen.width, window.screen.height)),
-        );
+        const maxCanvasSize = 8192;
         this.uiLayout = (
             this.embed
                 ? 'left'
@@ -375,6 +371,23 @@ export class KlApp {
         let currentColor = new BB.RGB(0, 0, 0);
         let currentBrushUi: TBrushUiInstance<any>;
         let currentBrushId: TBrushId;
+        DIAGNOSTICS.setProjectProvider(() => {
+            const layers = this.klCanvas.getLayers();
+            const entries = this.klHistory.getEntries();
+            return {
+                width: this.klCanvas.getWidth(),
+                height: this.klCanvas.getHeight(),
+                layerCount: layers.length,
+                visibleLayerCount: layers.filter((layer) => layer.isVisible && layer.opacity > 0).length,
+                background: this.klCanvas.getBackground(),
+                historyEntryCount: entries.length,
+                historyEstimatedBytes: entries.reduce((sum, entry) => sum + entry.memoryEstimateBytes, 0),
+                brushId: currentBrushId,
+                brushSize: currentBrushUi?.getSize(),
+                brushOpacity: currentBrushUi?.getOpacity(),
+                maxCanvasSize,
+            };
+        });
         let lastNonEraserBrushId: TBrushId;
         let currentLayerIndex: number = this.klCanvas.getLayerCount() - 1;
 
@@ -432,6 +445,10 @@ export class KlApp {
         });
 
         drawEventChain.setChainOut(((event: TDrawEvent) => {
+            const diagnosticStart = DIAGNOSTICS.isRecording() ? performance.now() : undefined;
+            if (diagnosticStart !== undefined) {
+                DIAGNOSTICS.record('brush.dispatch', { ...event, brushId: currentBrushId });
+            }
             if (event.type === 'down') {
                 this.toolspace.style.pointerEvents = 'none';
                 currentBrushUi.startLine(event.x, event.y, event.pressure);
@@ -452,6 +469,9 @@ export class KlApp {
                 currentBrushUi.getBrush().drawLineSegment(event.x0, event.y0, event.x1, event.y1);
                 this.easelBrush.setLastDrawEvent({ x: event.x1, y: event.y1 });
                 this.easel.requestRender();
+            }
+            if (diagnosticStart !== undefined) {
+                DIAGNOSTICS.measure('brush.dispatch.' + event.type, performance.now() - diagnosticStart);
             }
         }) as any);
 
@@ -1701,13 +1721,6 @@ export class KlApp {
             applyUncommitted();
             KL.newImageDialog({
                 maxCanvasSize,
-                canvasWidth: this.klCanvas.getWidth(),
-                canvasHeight: this.klCanvas.getHeight(),
-                workspaceWidth:
-                    window.innerWidth < this.collapseThreshold
-                        ? this.uiWidth
-                        : this.uiWidth - this.toolWidth,
-                workspaceHeight: this.uiHeight,
                 onConfirm: (width, height, background) => {
                     this.klCanvas.reset({
                         width: width,

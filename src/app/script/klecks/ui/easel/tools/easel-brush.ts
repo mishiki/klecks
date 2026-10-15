@@ -1,3 +1,4 @@
+import { traceAppPointer } from '../../../../bb/diagnostics/trace-app-pointer';
 import { BB } from '../../../../bb/bb';
 import { TPointerEvent } from '../../../../bb/input/event.types';
 import { createMatrixFromTransform } from '../../../../bb/transform/create-matrix-from-transform';
@@ -55,6 +56,7 @@ export class EaselBrush implements TEaselTool {
     private isOver: boolean = false;
 
     private onExplodedPointer(e: TCoalescedPointerEvent): void {
+        traceAppPointer('brush.pointer', e);
         const vTransform = this.easel.getTransform();
         const m = createMatrixFromTransform(vTransform);
         // canvas coordinates

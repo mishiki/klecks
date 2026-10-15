@@ -1,4 +1,15 @@
 {
+  "diagnostics-title": {"original":"Diagnostics · v1","value":"診断 · v1"},
+  "diagnostics-description": {"original":"Record device, input and timing information for up to 2 minutes. Save the log locally; image pixels are not included. Starting again replaces the previous log.","value":"端末情報・入力・処理時間を最大2分記録します。ログは端末に保存し、画像の画素は含めません。再開始すると前の記録を置き換えます。"},
+  "diagnostics-idle": {"original":"Not recording","value":"記録していません"},
+  "diagnostics-start": {"original":"Start recording","value":"記録開始"},
+  "diagnostics-recording": {"original":"Recording (automatically stops after 2 minutes)","value":"記録中（2分で自動停止）"},
+  "diagnostics-ready": {"original":"Recording stopped. Save the log before reloading.","value":"記録終了。再読み込みする前にログを保存してください。"},
+  "diagnostics-save": {"original":"Save log","value":"ログを保存"},
+  "diagnostics-stop-save": {"original":"● Stop and save log","value":"● 記録を終了して保存"},
+  "new-ratio-height-too-large": {"original":"This ratio requires a height above the {max}px maximum. Reduce the width or choose another ratio.","value":"この比率では高さが上限の{max}pxを超えます。幅を小さくするか、比率を変更してください。"},
+  "new-size-invalid": {"original":"Width and height must be whole numbers from 1 to {max} px.","value":"幅と高さは1〜{max}pxの整数で入力してください。"},
+
   'switch-ui-left-right': {
     hint: 'Button that switches layout from left to right, to accommodate left handed & right handed visitors.',
     original: 'Switch left/right UI',

@@ -1,4 +1,5 @@
 import { EVENT_USES_HIGH_RES_TIMESTAMP, HAS_POINTER_EVENTS, IS_FIREFOX } from '../base/browser';
+import { DIAGNOSTICS } from '../diagnostics/diagnostics';
 import { TWheelCleanerEvent, WheelCleaner } from './wheel-cleaner';
 import {
     TPointerButton,
@@ -20,6 +21,7 @@ export type TPointerListenerParams = {
     onEnterLeave?: (isOver: boolean) => void;
     // int [1,n] default is 1 - how many concurrent pointers to pay attention to
     maxPointers?: number;
+    diagnosticLabel?: string;
     // fix ipad scribble issue - TODO remove, fixed start of 2022 -> https://bugs.webkit.org/show_bug.cgi?id=217430#c2
     fixScribble?: boolean;
 };
@@ -295,6 +297,7 @@ export class PointerListener {
     private readonly onEnterLeaveCallback: undefined | ((isOver: boolean) => void);
     private readonly maxPointers: number;
     private readonly wheelCleaner: WheelCleaner | undefined;
+    private readonly diagnosticLabel: string | undefined;
     private isOverCounter: number = 0;
 
     // pointers that are pressing a button
@@ -322,6 +325,14 @@ export class PointerListener {
     private readonly onTouchMove: ((e: TouchEvent) => void) | undefined;
     private readonly onTouchEnd: ((e: TouchEvent) => void) | undefined;
     private readonly onTouchCancel: ((e: TouchEvent) => void) | undefined;
+
+    private recordPointerDiagnostic(
+        stage: string,
+        event: PointerEvent,
+        details: Record<string, unknown>,
+    ): void {
+        DIAGNOSTICS.pointer(stage, event, { label: this.diagnosticLabel, ...details });
+    }
 
     private getDragObj(pointerId: number): TDragObj | null {
         for (let i = 0; i < this.dragObjArr.length; i++) {
@@ -435,6 +446,7 @@ export class PointerListener {
         this.onWheelCallback = p.onWheel;
         this.onEnterLeaveCallback = p.onEnterLeave;
         this.maxPointers = Math.max(1, p.maxPointers ?? 1);
+        this.diagnosticLabel = p.diagnosticLabel;
 
         const finalizeWheelEvent = (e: WheelEvent | TWheelCleanerEvent): void => {
             if (this.isDestroyed || !this.onWheelCallback) {
@@ -469,6 +481,21 @@ export class PointerListener {
                     this.dragPointerIdArr.length === this.maxPointers ||
                     correctedEvent.pointerType === 'touch'
                 ) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        let reason = 'touch';
+                        if (this.dragPointerIdArr.length === this.maxPointers) {
+                            reason = 'capacity-reached';
+                        }
+                        if (this.dragPointerIdArr.includes(correctedEvent.pointerId)) {
+                            reason = 'already-tracked';
+                        }
+                        this.recordPointerDiagnostic('listener.move.ignored', event, {
+                            reason, mode: 'hover', correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            expectedButtons: this.getDragObj(correctedEvent.pointerId)?.buttons,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     this.didSkip = false;
                     return;
                 }
@@ -479,11 +506,26 @@ export class PointerListener {
                     correctedEvent.pointerType === 'mouse' &&
                     tempLastPointerType === 'pen'
                 ) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.move.ignored', event, {
+                            reason: 'stylus-mouse-glitch', mode: 'hover',
+                            correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     this.didSkip = true;
                     return;
                 }
                 this.didSkip = false;
 
+                if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                    this.recordPointerDiagnostic('listener.move.accept', event, {
+                        mode: 'hover', correctedButtons: correctedEvent.buttons,
+                        correctedPressure: correctedEvent.pressure,
+                        activePointerIds: this.dragPointerIdArr.slice(),
+                    });
+                }
                 const outEvent = this.createPointerOutEvent('pointermove', correctedEvent);
                 this.onPointerCallback?.(outEvent);
             };
@@ -492,11 +534,34 @@ export class PointerListener {
                 //BB.throwOut('pointerdown ' + event.pointerId + ' | ' + dragPointerIdArr.length);
                 const correctedEvent = correctPointerEvent(event, true);
                 ////console.log('debug: ' + event.pointerId + ' pointerdown');
+                if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                    this.recordPointerDiagnostic('listener.down.received', event, {
+                        correctedButtons: correctedEvent.buttons,
+                        correctedPressure: correctedEvent.pressure,
+                        expectedButtons: 'one of 1, 2, 4',
+                        activePointerIds: this.dragPointerIdArr.slice(),
+                    });
+                }
                 if (
                     this.dragPointerIdArr.includes(correctedEvent.pointerId) ||
                     this.dragPointerIdArr.length === this.maxPointers ||
                     ![1, 2, 4].includes(correctedEvent.buttons)
                 ) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        let reason = 'buttons';
+                        if (this.dragPointerIdArr.length === this.maxPointers) {
+                            reason = 'full';
+                        }
+                        if (this.dragPointerIdArr.includes(correctedEvent.pointerId)) {
+                            reason = 'duplicate';
+                        }
+                        this.recordPointerDiagnostic('listener.down.ignored', event, {
+                            reason, correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            expectedButtons: 'one of 1, 2, 4',
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     //BB.throwOut('pointerdown ignored');
                     return;
                 }
@@ -518,6 +583,14 @@ export class PointerListener {
                 this.dragObjArr.push(dragObj);
                 this.dragPointerIdArr.push(correctedEvent.pointerId);
 
+                if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                    this.recordPointerDiagnostic('listener.down.accept', event, {
+                        correctedButtons: correctedEvent.buttons,
+                        correctedPressure: correctedEvent.pressure,
+                        expectedButtons: dragObj.buttons,
+                        activePointerIds: this.dragPointerIdArr.slice(),
+                    });
+                }
                 const outEvent: TPointerEvent = this.createPointerOutEvent(
                     'pointerdown',
                     correctedEvent,
@@ -537,12 +610,28 @@ export class PointerListener {
                 const correctedEvent = correctPointerEvent(event);
                 ////console.log('debug: ' + event.pointerId + ' GLOBALpointermove');
                 if (!this.dragPointerIdArr.includes(correctedEvent.pointerId)) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.move.ignored', event, {
+                            reason: 'untracked', mode: 'drag',
+                            correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     return;
                 }
 
                 const dragObj = this.getDragObj(correctedEvent.pointerId);
 
                 if (!dragObj) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.move.ignored', event, {
+                            reason: 'missing-drag', mode: 'drag',
+                            correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     // todo need to handle this!
                     return;
                 }
@@ -557,6 +646,15 @@ export class PointerListener {
                     }
                     this.removeDragObj(correctedEvent.pointerId);
 
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.move.synthetic-up', event, {
+                            reason: 'buttons-changed', mode: 'drag',
+                            correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            expectedButtons: dragObj.buttons,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     const outEvent = this.createPointerOutEvent('pointerup', correctedEvent, {
                         downPageX: dragObj.downPageX,
                         downPageY: dragObj.downPageY,
@@ -572,10 +670,27 @@ export class PointerListener {
                     correctedEvent.pageY === dragObj.lastPageY &&
                     correctedEvent.timeStamp === dragObj.lastTimeStamp
                 ) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.move.ignored', event, {
+                            reason: 'duplicate-timestamp', mode: 'drag',
+                            correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            expectedButtons: dragObj.buttons,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     //ignore
                     return;
                 }
 
+                if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                    this.recordPointerDiagnostic('listener.move.accept', event, {
+                        mode: 'drag', correctedButtons: correctedEvent.buttons,
+                        correctedPressure: correctedEvent.pressure,
+                        expectedButtons: dragObj.buttons,
+                        activePointerIds: this.dragPointerIdArr.slice(),
+                    });
+                }
                 const outEvent = this.createPointerOutEvent('pointermove', correctedEvent, {
                     downPageX: dragObj.downPageX,
                     downPageY: dragObj.downPageY,
@@ -595,6 +710,13 @@ export class PointerListener {
                 const correctedEvent = correctPointerEvent(event);
                 ////console.log('debug: ' + event.pointerId + ' GLOBALpointerup');
                 if (!this.dragPointerIdArr.includes(correctedEvent.pointerId)) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.up.ignored', event, {
+                            reason: 'untracked', correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     return;
                 }
 
@@ -604,10 +726,25 @@ export class PointerListener {
                 }
                 const dragObj = this.removeDragObj(correctedEvent.pointerId);
                 if (!dragObj) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.up.ignored', event, {
+                            reason: 'missing-drag', correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     // todo need to handle this!
                     return;
                 }
 
+                if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                    this.recordPointerDiagnostic('listener.up.cleanup', event, {
+                        correctedButtons: correctedEvent.buttons,
+                        correctedPressure: correctedEvent.pressure,
+                        expectedButtons: dragObj.buttons,
+                        activePointerIds: this.dragPointerIdArr.slice(),
+                    });
+                }
                 const outEvent = this.createPointerOutEvent('pointerup', correctedEvent, {
                     downPageX: dragObj.downPageX,
                     downPageY: dragObj.downPageY,
@@ -619,7 +756,15 @@ export class PointerListener {
                 //BB.throwOut('pointerleave ' + event.pointerId);
                 const correctedEvent = correctPointerEvent(event);
                 ////console.log('debug: ' + event.pointerId + ' onGlobalPointerLeave', event);
+                const cleanupKind = event.type === pointerLeaveEvt ? 'leave' : 'cancel';
                 if (!this.dragPointerIdArr.includes(correctedEvent.pointerId)) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.' + cleanupKind + '.ignored', event, {
+                            reason: 'untracked', correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     //} || event.target !== document) {
                     return;
                 }
@@ -630,10 +775,25 @@ export class PointerListener {
                 }
                 const dragObj = this.removeDragObj(correctedEvent.pointerId);
                 if (!dragObj) {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.' + cleanupKind + '.ignored', event, {
+                            reason: 'missing-drag', correctedButtons: correctedEvent.buttons,
+                            correctedPressure: correctedEvent.pressure,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
                     // todo need to handle this!
                     return;
                 }
 
+                if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                    this.recordPointerDiagnostic('listener.' + cleanupKind + '.cleanup', event, {
+                        correctedButtons: correctedEvent.buttons,
+                        correctedPressure: correctedEvent.pressure,
+                        expectedButtons: dragObj.buttons,
+                        activePointerIds: this.dragPointerIdArr.slice(),
+                    });
+                }
                 const outEvent = this.createPointerOutEvent('pointerup', correctedEvent, {
                     downPageX: dragObj.downPageX,
                     downPageY: dragObj.downPageY,

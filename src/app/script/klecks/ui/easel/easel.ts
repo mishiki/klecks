@@ -1,3 +1,5 @@
+import { DIAGNOSTICS } from '../../../bb/diagnostics/diagnostics';
+import { traceAppPointer } from '../../../bb/diagnostics/trace-app-pointer';
 import { c } from '../../../bb/base/c';
 import { ProjectViewport, TViewportTransform } from '../project-viewport/project-viewport';
 import { PointerListener } from '../../../bb/input/pointer-listener';
@@ -192,7 +194,11 @@ export class Easel<GToolId extends string> {
             newTransform.angleDeg !== this.lastRenderedTransform.angleDeg;
         const isMirroredChanged = newTransform.isMirrored !== this.lastRenderedTransform.isMirrored;
 
+        const diagnosticStart = DIAGNOSTICS.isRecording() ? performance.now() : undefined;
         this.viewport.render(!isTransformEqual(oldTransform, newTransform));
+        if (diagnosticStart !== undefined) {
+            DIAGNOSTICS.measure('easel.render', performance.now() - diagnosticStart);
+        }
         if (isPositionChanged || isScaleOrAngleChanged || isMirroredChanged) {
             tool.onUpdateTransform?.(newTransform);
             this.selectionRenderer.setTransform(newTransform);
@@ -365,6 +371,9 @@ export class Easel<GToolId extends string> {
             onUndo: this.onUndo,
             onRedo: this.onRedo,
             onPinch: (event) => {
+                if (DIAGNOSTICS.isRecording()) {
+                    DIAGNOSTICS.record('easel.gesture.pinch', { type: event.type });
+                }
                 if (event.type === 'move') {
                     const transform = this.viewport.getTransform();
                     if (!this.pinchInitialTransform) {
@@ -417,6 +426,10 @@ export class Easel<GToolId extends string> {
                 }
             },
             onChainOut: (e) => {
+                traceAppPointer('easel.after-gestures', e);
+                if (DIAGNOSTICS.isRecording() && e.type === 'pointerdown') {
+                    DIAGNOSTICS.record('easel.tool', { toolId: this.tempToolId ?? this.toolId });
+                }
                 this.cursorPos = {
                     x: e.relX,
                     y: e.relY,
@@ -484,8 +497,14 @@ export class Easel<GToolId extends string> {
 
         this.pointerListener = new PointerListener({
             target: this.viewport.getElement(),
+            diagnosticLabel: 'easel',
             onPointer: (e) => {
+                traceAppPointer('easel.before-gestures', e);
+                const diagnosticStart = DIAGNOSTICS.isRecording() ? performance.now() : undefined;
                 this.pointerPreprocessor.chainIn(e);
+                if (diagnosticStart !== undefined) {
+                    DIAGNOSTICS.measure('easel.input-dispatch', performance.now() - diagnosticStart);
+                }
             },
             onWheel: this.onWheel,
             onEnterLeave: (isOver) => {

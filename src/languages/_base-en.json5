@@ -13,6 +13,17 @@ Renaming a key across multiple language files:
 -> translations are updated. You need to manually remove "oldKey".
 */
 {
+  "diagnostics-title": "Diagnostics · v1",
+  "diagnostics-description": "Record device, input and timing information for up to 2 minutes. Save the log locally; image pixels are not included. Starting again replaces the previous log.",
+  "diagnostics-idle": "Not recording",
+  "diagnostics-start": "Start recording",
+  "diagnostics-recording": "Recording (automatically stops after 2 minutes)",
+  "diagnostics-ready": "Recording stopped. Save the log before reloading.",
+  "diagnostics-save": "Save log",
+  "diagnostics-stop-save": "● Stop and save log",
+  "new-ratio-height-too-large": "This ratio requires a height above the {max}px maximum. Reduce the width or choose another ratio.",
+  "new-size-invalid": "Width and height must be whole numbers from 1 to {max} px.",
+
   "switch-ui-left-right": {
     hint: "Button that switches layout from left to right, to accommodate left handed & right handed visitors.",
     value: "Switch left/right UI"

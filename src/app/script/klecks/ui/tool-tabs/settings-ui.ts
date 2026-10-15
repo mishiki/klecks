@@ -1,3 +1,4 @@
+import { createDiagnosticsPanel } from '../components/diagnostics-panel';
 import { SelectCustom } from '../components/select-custom';
 import { getIconSvg, getIconUrl } from '../../../icon/icon';
 import { BB } from '../../../bb/bb';
@@ -221,6 +222,8 @@ export class SettingsUi {
                 tabIndex: -1,
             },
         });
+
+        this.rootEl.append(createDiagnosticsPanel());
 
         // ---- about ----
         this.rootEl.append(BB.el({ className: 'grid-hr', css: { margin: '10px 0' } }));
