@@ -1,3 +1,5 @@
+import { diagnosticError, diagnosticLocation } from './diagnostic-error';
+
 export type TDiagnosticProjectSnapshot = {
     width: number;
     height: number;
@@ -21,7 +23,7 @@ type TDiagnosticHeapSample = {
     tMs: number; usedBytes: number | null; totalBytes: number | null; limitBytes: number | null;
 };
 
-const BUILD_LABEL = 'layer-background-diagnostics-v1';
+const BUILD_LABEL = 'layer-background-diagnostics-v2-psd';
 const MAX_DURATION_MS = 120_000;
 const MAX_EVENTS = 50_000;
 const MAX_PROJECT_SNAPSHOTS = 121;
@@ -165,6 +167,11 @@ class DiagnosticsRecorder {
         this.recording = false;
         this.cleanup();
         this.notifySubscribers();
+    }
+
+    recordError(kind: string, error: unknown, details?: Record<string, unknown>): void {
+        if (!this.recording) return;
+        this.record(kind, { ...details, ...diagnosticError(error) });
     }
 
     record(kind: string, data?: Record<string, unknown>): void {
@@ -509,21 +516,12 @@ class DiagnosticsRecorder {
         addWindow('webglcontextlost', contextListener('webgl-context-lost'));
         addWindow('webglcontextrestored', contextListener('webgl-context-restored'));
         addWindow('error', ((event: ErrorEvent) => {
-            const error = event.error as { name?: unknown } | null;
-            this.record('window-error', { errorName: safeIdentifier(error?.name, 'Error'), message: boundedText(event.message, 240) });
+            this.recordError('window-error', event.error ?? event.message, {
+                asset: diagnosticLocation(event.filename), line: event.lineno, column: event.colno,
+            });
         }) as EventListener);
         addWindow('unhandledrejection', ((event: PromiseRejectionEvent) => {
-            let errorName = 'Rejection';
-            let message: string | null = null;
-            try {
-                if (typeof event.reason === 'string') message = boundedText(event.reason, 240);
-                else if (event.reason && typeof event.reason === 'object') {
-                    const reason = event.reason as { name?: unknown; message?: unknown };
-                    errorName = safeIdentifier(reason.name, 'Rejection');
-                    message = boundedText(reason.message, 240);
-                }
-            } catch { /* Do not stringify arbitrary rejection values. */ }
-            this.record('unhandled-rejection', { errorName, message });
+            this.recordError('unhandled-rejection', event.reason);
         }) as EventListener);
         if (typeof document !== 'undefined') {
             const listener: EventListener = () => this.record('visibility-change', {

@@ -13,6 +13,8 @@ New Image accepts dimensions up to 8192 × 8192. Its initial width is the rounde
 
 In Settings, Diagnostics starts a local recording for up to two minutes. Switch back to the brush and reproduce the issue, then use the floating stop/save button. The JSON report contains browser/device capabilities, project dimensions/layer counts, optional JS heap data, pointer events and input decisions, and timing summaries. Image pixels are not included and logs are not uploaded. Recordings are bounded; the report states how many old events were discarded. Save before reloading or starting another recording.
 
+PSD import diagnostics include a per-import ID, stage start/end and duration, file byte size, document dimensions/depth/color mode, layer/group/mask/adjustment counts, conversion warnings, fallback causes, dialog cancellation, and final outcome. Errors retain bounded messages and stack locations (script basename, line, column); URL hosts and local paths are removed. Document names and pixels are not deliberately recorded. Start recording before selecting the PSD; after a failure or an apparently stalled import, stop and save the report. A final stage-start without a matching end identifies the last observed operation, not by itself its cause. Browser/process crashes and out-of-memory termination may prevent exporting a report.
+
 Timing values measure JavaScript work and requestAnimationFrame cadence, not completed GPU work or CPU/GPU utilization. Layer RGBA memory is a theoretical estimate, separate from the optional JS heap measurement. Unsupported browser information is reported as unavailable. Diagnostics itself adds some overhead; it is off by default.
 
 Build and launch commands are listed below. Magic wand and SAI2 import/export are still planned.
