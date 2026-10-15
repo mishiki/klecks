@@ -636,6 +636,19 @@ export class PointerListener {
                     return;
                 }
 
+                // Some browsers deliver a delayed mouse hover using the active pen's ID.
+                // It must not end the pen stroke or replace its last drawing position.
+                if (dragObj.pointerType === 'pen' && correctedEvent.pointerType === 'mouse') {
+                    if (this.diagnosticLabel && DIAGNOSTICS.isRecording()) {
+                        this.recordPointerDiagnostic('listener.move.ignored', event, {
+                            reason: 'mouse-during-pen-drag', mode: 'drag',
+                            expectedButtons: dragObj.buttons,
+                            activePointerIds: this.dragPointerIdArr.slice(),
+                        });
+                    }
+                    return;
+                }
+
                 //if pointer changes button its pressing -> turn into pointerup
                 if (correctedEvent.buttons !== dragObj.buttons) {
                     //pointer up
