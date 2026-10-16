@@ -1,3 +1,4 @@
+import { APP_PRESS_DEFAULTS } from '../bb/input/keybindings-app-defaults';
 import { DIAGNOSTICS } from '../bb/diagnostics/diagnostics';
 import { getIconUrl } from '../icon/icon';
 import { KL } from '../klecks/kl';
@@ -80,6 +81,7 @@ import { ToolspaceTopRow } from '../klecks/ui/components/toolspace-top-row';
 import { setupUnfocusOnClickService } from '../klecks/ui/onfocus-on-click-service';
 import { FloatingLayerPreview } from '../klecks/ui/components/floating-layer-preview';
 import { isGroupLayer } from '../klecks/canvas/layer-tree';
+import { KEY_BINDINGS } from '../bb/input/keybindings';
 
 const toolPaintImg = getIconUrl('tool-paint');
 const toolHandImg = getIconUrl('tool-hand');
@@ -1037,35 +1039,32 @@ export class KlApp {
                     return;
                 }
 
-                if (comboStr === 'home' && !isRepeat) {
+                // Assigned keys must not also trigger the browser's default action.
+                if (Object.keys(APP_PRESS_DEFAULTS).some((action) => KEY_BINDINGS.matches('onPress', action, comboStr))) {
+                    event.preventDefault();
+                }
+
+                if (KEY_BINDINGS.matches('onPress', 'fitView', comboStr) && !isRepeat) {
                     this.easel.fitTransform();
                 }
-                if (comboStr === 'end' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'resetView', comboStr) && !isRepeat) {
                     this.easel.resetTransform();
                 }
-                // more reliably this way
-                const isCtrlOrCmd = (event.ctrlKey || event.metaKey) && !event.altKey;
-                const isShift = event.shiftKey;
-                // ctrl+z
-                const isUndo = isCtrlOrCmd && !isShift && keyStr === 'z';
-                // ctrl+shift+z or ctrl+y
-                const isRedo =
-                    (isCtrlOrCmd && isShift && keyStr === 'z') || (isCtrlOrCmd && keyStr === 'y');
-                if (isUndo) {
+                if (KEY_BINDINGS.matches('onPress', 'undo', comboStr)) {
                     event.preventDefault();
                     undo();
                 }
-                if (isRedo) {
+                if (KEY_BINDINGS.matches('onPress', 'redo', comboStr)) {
                     event.preventDefault();
                     redo();
                 }
                 if (!this.embed) {
-                    if (['ctrl+s', 'cmd+s'].includes(comboStr) && !isRepeat) {
+                    if (KEY_BINDINGS.matches('onPress', 'save', comboStr) && !isRepeat) {
                         event.preventDefault();
                         applyUncommitted();
                         this.saveToComputer.save();
                     }
-                    if (['ctrl+shift+s', 'cmd+shift+s'].includes(comboStr) && !isRepeat) {
+                    if (KEY_BINDINGS.matches('onPress', 'saveProject', comboStr) && !isRepeat) {
                         event.preventDefault();
                         applyUncommitted();
                         if (projectStore) {
@@ -1128,27 +1127,30 @@ export class KlApp {
                             this.statusOverlay.out('❌ ' + LANG('file-storage-failed'), true);
                         }
                     }
-                    if (['ctrl+c', 'cmd+c'].includes(comboStr) && !isRepeat) {
+                    if (KEY_BINDINGS.matches('onPress', 'copy', comboStr) && !isRepeat) {
                         event.preventDefault();
                         applyUncommitted();
                         copyToClipboard(true);
                     }
                 }
-                if (['ctrl+a', 'cmd+a'].includes(comboStr)) {
+                // Ctrl+A is intercepted so the canvas itself does not become
+                // selected. It is intentionally exposed as a separate action
+                // because it has no application selection operation to invoke.
+                if (KEY_BINDINGS.matches('onPress', 'preventNativeSelectAll', comboStr)) {
                     event.preventDefault();
                 }
 
-                if (comboStr === 'sqbr_open') {
+                if (KEY_BINDINGS.matches('onPress', 'decreaseBrushSize', comboStr)) {
                     currentBrushUi.decreaseSize(
                         Math.max(0.005, 0.03 / this.easel.getTransform().scale),
                     );
                 }
-                if (comboStr === 'sqbr_close') {
+                if (KEY_BINDINGS.matches('onPress', 'increaseBrushSize', comboStr)) {
                     currentBrushUi.increaseSize(
                         Math.max(0.005, 0.03 / this.easel.getTransform().scale),
                     );
                 }
-                if (comboStr === 'enter' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'fillLayer', comboStr) && !isRepeat) {
                     if (
                         currentLayerTarget !== 'mask' &&
                         !applyUncommitted() &&
@@ -1168,22 +1170,22 @@ export class KlApp {
                         );
                     }
                 }
-                if (comboStr === 'esc' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'cancel', comboStr) && !isRepeat) {
                     if (discardUncommitted()) {
                         event.preventDefault();
                     }
                 }
-                if (['delete', 'backspace'].includes(comboStr) && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'clearLayer', comboStr) && !isRepeat) {
                     clearLayer(true);
                 }
-                if ((comboStr === 'ctrl+shift+e' || comboStr === 'shift+ctrl+e') && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'advancedMerge', comboStr) && !isRepeat) {
                     event.preventDefault();
                     this.layersUi.advancedMergeDialog();
                 }
-                if (comboStr === 'shift+e' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'toggleEraser', comboStr) && !isRepeat) {
                     event.preventDefault();
                     currentBrushUi.toggleEraser?.();
-                } else if (comboStr === 'e' && !isRepeat) {
+                } else if (KEY_BINDINGS.matches('onPress', 'eraserBrush', comboStr) && !isRepeat) {
                     event.preventDefault();
                     applyUncommitted();
                     this.toolspaceToolRow.setActive('brush');
@@ -1192,7 +1194,7 @@ export class KlApp {
                     updateMainTabVisibility();
                     brushTabRow.open('eraserBrush');
                 }
-                if (comboStr === 'b' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'nextBrush', comboStr) && !isRepeat) {
                     event.preventDefault();
                     const prevMode = this.easel.getTool();
                     const prevMainTabId = mainTabRow?.getOpenedTabId();
@@ -1209,11 +1211,11 @@ export class KlApp {
                               : currentBrushId,
                     );
                 }
-                if (comboStr === 'h' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'handTool', comboStr) && !isRepeat) {
                     event.preventDefault();
                     this.toolspaceToolRow.setActive('hand', true);
                 }
-                if (comboStr === 'g' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'togglePaintBucketGradient', comboStr) && !isRepeat) {
                     if (currentLayerTarget === 'mask') {
                         return;
                     }
@@ -1226,7 +1228,7 @@ export class KlApp {
                     mainTabRow?.open(newMode);
                     updateMainTabVisibility();
                 }
-                if (comboStr === 't' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'textTool', comboStr) && !isRepeat) {
                     if (currentLayerTarget === 'mask') {
                         return;
                     }
@@ -1237,7 +1239,7 @@ export class KlApp {
                     mainTabRow?.open('text');
                     updateMainTabVisibility();
                 }
-                if (comboStr === 'u' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'shapeTool', comboStr) && !isRepeat) {
                     if (currentLayerTarget === 'mask') {
                         return;
                     }
@@ -1248,7 +1250,7 @@ export class KlApp {
                     mainTabRow?.open('shape');
                     updateMainTabVisibility();
                 }
-                if (comboStr === 'l' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'selectTool', comboStr) && !isRepeat) {
                     if (currentLayerTarget === 'mask') {
                         return;
                     }
@@ -1272,13 +1274,245 @@ export class KlApp {
                         klAppSelect.getSelectUi().setMode('transform');
                     }
                 }
-                if (comboStr === 'x' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'swapColors', comboStr) && !isRepeat) {
                     event.preventDefault();
                     this.klColorSlider.swapColors();
                 }
-                if (comboStr === 'm' && !isRepeat) {
+                if (KEY_BINDINGS.matches('onPress', 'flipView', comboStr) && !isRepeat) {
                     event.preventDefault();
                     this.easel.setIsMirrored(!this.easel.getIsMirrored());
+                }
+
+                // Dedicated assignments are kept separate from the historical
+                // cycling shortcuts above. This lets a keybindings file choose
+                // a specific tool or brush without changing the old defaults.
+                const directToolArr: [string, TKlAppToolId][] = [
+                    ['toolBrush', 'brush'],
+                    ['toolHand', 'hand'],
+                    ['toolPaintBucket', 'paintBucket'],
+                    ['toolGradient', 'gradient'],
+                    ['toolText', 'text'],
+                    ['toolShape', 'shape'],
+                    ['toolSelect', 'select'],
+                    ['toolEyedropper', 'eyedropper'],
+                    ['toolRotate', 'rotate'],
+                    ['toolZoom', 'zoom'],
+                ];
+                for (const [action, toolId] of directToolArr) {
+                    if (!KEY_BINDINGS.matches('onPress', action, comboStr) || isRepeat) {
+                        continue;
+                    }
+                    if (
+                        currentLayerTarget === 'mask' &&
+                        toolId !== 'brush' &&
+                        toolId !== 'hand'
+                    ) {
+                        continue;
+                    }
+                    event.preventDefault();
+                    if (toolId === 'rotate' || toolId === 'zoom') {
+                        applyUncommitted();
+                        this.easel.setTool(toolId);
+                        continue;
+                    }
+                    if (toolId === 'eyedropper') {
+                        this.klColorSlider.setIsEyedropping(true);
+                        this.mobileColorUi.setIsEyedropping(true);
+                        this.easel.setTool('eyedropper');
+                        continue;
+                    }
+                    if (toolId === 'hand') {
+                        this.toolspaceToolRow.setActive('hand', true);
+                        continue;
+                    }
+                    if (toolId === 'select') {
+                        applyUncommitted();
+                        this.toolspaceToolRow.setActive('select', true);
+                        klAppSelect.getSelectUi().setMode('select');
+                        continue;
+                    }
+                    applyUncommitted();
+                    this.toolspaceToolRow.setActive(toolId, true);
+                }
+                if (KEY_BINDINGS.matches('onPress', 'toolTransform', comboStr) && !isRepeat) {
+                    if (currentLayerTarget === 'mask') {
+                        return;
+                    }
+                    event.preventDefault();
+                    applyUncommitted();
+                    this.toolspaceToolRow.setActive('select', true);
+                    klAppSelect.getSelectUi().setMode('transform');
+                }
+
+                const directBrushArr: [string, TBrushId][] = [
+                    ['brushPen', 'penBrush'],
+                    ['brushBlend', 'blendBrush'],
+                    ['brushSketchy', 'sketchyBrush'],
+                    ['brushPixel', 'pixelBrush'],
+                    ['brushChemy', 'chemyBrush'],
+                    ['brushSmudge', 'smudgeBrush'],
+                    ['brushEraser', 'eraserBrush'],
+                ];
+                for (const [action, brushId] of directBrushArr) {
+                    if (!KEY_BINDINGS.matches('onPress', action, comboStr) || isRepeat) {
+                        continue;
+                    }
+                    event.preventDefault();
+                    applyUncommitted();
+                    this.toolspaceToolRow.setActive('brush');
+                    this.easel.setTool('brush');
+                    mainTabRow?.open('brush');
+                    updateMainTabVisibility();
+                    brushTabRow.open(
+                        currentLayerTarget === 'mask' && !supportsMaskBrush(brushId)
+                            ? 'penBrush'
+                            : brushId,
+                    );
+                }
+
+                if (KEY_BINDINGS.matches('onPress', 'newImage', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    showNewImageDialog();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'openFile', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    fileUi?.triggerOpen();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'placeFile', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    fileUi?.triggerPlace();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'savePsd', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.saveAsPsd();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'shareImage', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    shareImage();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'openHome', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    showIframeModal('./home/', !!this.embed);
+                }
+                if (KEY_BINDINGS.matches('onPress', 'openHelp', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    showIframeModal(this.helpPath, !!this.embed);
+                }
+                if (KEY_BINDINGS.matches('onPress', 'openBrowserStorage', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    onOpenBrowserStorage();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'openRecovery', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    fileUi?.triggerRecovery();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'uploadImage', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    fileUi?.triggerUpload();
+                }
+                const tabActionArr: [string, string][] = [
+                    ['showFileTab', 'file'],
+                    ['showLayersTab', 'layers'],
+                    ['showEditTab', 'edit'],
+                    ['showSettingsTab', 'settings'],
+                ];
+                for (const [action, tabId] of tabActionArr) {
+                    if (KEY_BINDINGS.matches('onPress', action, comboStr) && !isRepeat) {
+                        event.preventDefault();
+                        mainTabRow?.open(tabId);
+                    }
+                }
+                if (KEY_BINDINGS.matches('onPress', 'paste', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    importHandler.readClipboard();
+                }
+
+                if (KEY_BINDINGS.matches('onPress', 'layerNew', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.newLayer();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerNewGroup', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.newGroup();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerDuplicate', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.duplicateSelected();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerRemove', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.removeSelected();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerMerge', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.mergeSelected();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerRename', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.renameSelected();
+                }
+                if (
+                    KEY_BINDINGS.matches('onPress', 'layerToggleClipping', comboStr) &&
+                    !isRepeat
+                ) {
+                    event.preventDefault();
+                    this.layersUi.toggleSelectedClipping();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerClear', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.clearSelected();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerMergeAll', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.mergeAll();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerAddMask', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.addMask();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerRemoveMask', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.removeMask();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerToggleMask', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.toggleMask();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerInvertMask', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.invertMask();
+                }
+                if (KEY_BINDINGS.matches('onPress', 'layerClearMask', comboStr) && !isRepeat) {
+                    event.preventDefault();
+                    this.layersUi.clearMask();
+                }
+
+                const filterActionArr: [string, string][] = [
+                    ['filterCropExtend', 'cropExtend'],
+                    ['filterFlip', 'flip'],
+                    ['filterPerspective', 'perspective'],
+                    ['filterResize', 'resize'],
+                    ['filterRotate', 'rotate'],
+                    ['filterTransform', 'transform'],
+                    ['filterBrightnessContrast', 'brightnessContrast'],
+                    ['filterCurves', 'curves'],
+                    ['filterDistort', 'distort'],
+                    ['filterHueSaturation', 'hueSaturation'],
+                    ['filterInvert', 'invert'],
+                    ['filterTiltShift', 'tiltShift'],
+                    ['filterToAlpha', 'toAlpha'],
+                    ['filterBlur', 'blur'],
+                    ['filterUnsharpMask', 'unsharpMask'],
+                    ['filterGrid', 'grid'],
+                    ['filterNoise', 'noise'],
+                    ['filterPattern', 'pattern'],
+                    ['filterVanishPoint', 'vanishPoint'],
+                ];
+                for (const [action, filterKey] of filterActionArr) {
+                    if (KEY_BINDINGS.matches('onPress', action, comboStr) && !isRepeat) {
+                        event.preventDefault();
+                        editUi.triggerFilter(filterKey);
+                    }
                 }
             },
             onUp: (keyStr, event) => {},

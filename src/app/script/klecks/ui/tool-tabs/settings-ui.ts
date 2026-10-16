@@ -14,6 +14,7 @@ import { SaveReminder } from '../components/save-reminder';
 import { showModal } from '../modals/base/show-modal';
 import { createImage } from '../../../bb/base/ui';
 import { PixelatedZoomToggle } from '../components/pixelated-zoom-toggle';
+import { createKeybindingsPanel } from '../components/keybindings-panel';
 
 const bitbofLogoImg = getIconUrl('bitbof-logo');
 const uiSwapImg = getIconUrl('ui-swap-lr');
@@ -148,6 +149,9 @@ export class SettingsUi {
             marginTop: 15,
         });
         this.rootEl.append(pixelatedZoomToggle.getElement());
+
+        // ---- keybindings ----
+        this.rootEl.append(createKeybindingsPanel());
 
         // ---- save reminder ----
         if (saveReminder) {

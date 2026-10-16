@@ -1,5 +1,6 @@
 import { BB } from '../../../../bb/bb';
 import { TPointerEvent, TPointerType } from '../../../../bb/input/event.types';
+import { KEY_BINDINGS } from '../../../../bb/input/keybindings';
 import { TVector2D } from '../../../../bb/bb-types';
 import { TSelectToolMode } from '../../tool-tabs/select-ui';
 import { createMatrixFromTransform } from '../../../../bb/transform/create-matrix-from-transform';
@@ -142,11 +143,11 @@ export class EaselSelect implements TEaselTool {
     private getEffectiveBooleanOperation(): TBooleanOperation {
         const isSubtract =
             this.defaultBooleanOperation === 'new'
-                ? this.easel.keyListener.isPressed('alt')
+                ? KEY_BINDINGS.held('selectionSubtract', this.easel.keyListener.getComboStr())
                 : this.defaultBooleanOperation === 'difference';
         const isAdd =
             this.defaultBooleanOperation === 'new'
-                ? this.easel.keyListener.isPressed('shift')
+                ? KEY_BINDINGS.held('selectionAdd', this.easel.keyListener.getComboStr())
                 : this.defaultBooleanOperation === 'union';
 
         if (isSubtract) {
@@ -195,7 +196,10 @@ export class EaselSelect implements TEaselTool {
             }
             if (event.type === 'pointermove' && event.button === 'left') {
                 this.didSelectionMove = true;
-                this.onGoMoveSelect(cursorCanvasPos, this.easel.keyListener.isPressed('shift'));
+                this.onGoMoveSelect(
+                    cursorCanvasPos,
+                    KEY_BINDINGS.held('selectionNudgeFine', this.easel.keyListener.getComboStr()),
+                );
             }
             if (event.type === 'pointerup') {
                 this.onEndMoveSelect();
@@ -258,7 +262,10 @@ export class EaselSelect implements TEaselTool {
                     this.onStartSelect(cursorCanvasPos, this.appliedBooleanOperation!);
                 }
                 if (event.type === 'pointermove' && event.button === 'left' && this.isDragging) {
-                    this.onGoSelect(cursorCanvasPos, this.easel.keyListener.isPressed('shift'));
+                    this.onGoSelect(
+                        cursorCanvasPos,
+                        KEY_BINDINGS.held('selectionNudgeFine', this.easel.keyListener.getComboStr()),
+                    );
                 }
                 if (event.type === 'pointerup' && wasDragging) {
                     this.onEndSelect();
@@ -742,7 +749,12 @@ export class EaselSelect implements TEaselTool {
             up: { x: 0, y: -1 },
             down: { x: 0, y: 1 },
         };
-        const multiplier = this.easel.isKeyPressed('shift') ? 5 : 1;
+        const multiplier = KEY_BINDINGS.held(
+            'selectionNudgeFine',
+            this.easel.keyListener.getComboStr(),
+        )
+            ? 5
+            : 1;
         const movement = movementMap[direction];
         this.freeTransform.move(movement.x * multiplier, movement.y * multiplier);
         return true;

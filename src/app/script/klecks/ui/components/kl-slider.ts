@@ -14,6 +14,7 @@ import { PointerListener } from '../../../bb/input/pointer-listener';
 import { TPointerEvent } from '../../../bb/input/event.types';
 import { TChainElement } from '../../../bb/input/event-chain/event-chain.types';
 import { css } from '../../../bb/base/base';
+import { KEY_BINDINGS } from '../../../bb/input/keybindings';
 
 /**
  * Horizontal slider, can be changed by dragging anywhere on it. Has a label & value.
@@ -236,6 +237,11 @@ export class KlSlider {
         const onPointer = (event: TPointerEvent) => {
             event.eventPreventDefault();
 
+            const pointerGesture = event.button ? `mouse-${event.button}` : undefined;
+            const isRelativePointer =
+                pointerGesture !== undefined &&
+                KEY_BINDINGS.matches('onGesture', 'sliderRelativeMouse', pointerGesture);
+
             if (!this.isEnabled) {
                 return;
             }
@@ -246,7 +252,7 @@ export class KlSlider {
 
                 this.sliderWrapperEl.className = 'slider-wrapper slider-wrapper--active';
 
-                if (event.button === 'left') {
+                if (event.button === 'left' && !isRelativePointer) {
                     let sliderValue = event.relX / this.elementWidth;
                     sliderValue = Math.max(0, Math.min(1, sliderValue));
                     this.value = sliderValueToValue(this.config, sliderValue);
@@ -256,10 +262,20 @@ export class KlSlider {
                 virtualVal = valueToSliderValue(this.config, this.value);
             }
 
-            if (event.type === 'pointermove' && ['left', 'right'].includes(event.button || '')) {
+            if (
+                event.type === 'pointermove' &&
+                event.button !== undefined &&
+                (event.button === 'left' || isRelativePointer)
+            ) {
                 let deltaX = event.dX;
                 const deltaY = Math.abs(event.pageY - (event.downPageY || 0));
-                const factor = calcSliderFalloffFactor(deltaY, event.button === 'right');
+                const factor = KEY_BINDINGS.matches(
+                    'onGesture',
+                    'sliderFineGrained',
+                    'vertical-fine',
+                )
+                    ? calcSliderFalloffFactor(deltaY, isRelativePointer)
+                    : 1;
                 deltaX *= factor;
                 deltaX /= this.elementWidth;
 
@@ -283,9 +299,14 @@ export class KlSlider {
                 fixScribble: true,
                 onPointer: (e) => {
                     onPointer(e);
-                    eventChain.chainIn(e);
+                    if (KEY_BINDINGS.matches('onGesture', 'sliderManualInput', 'double-tap')) {
+                        eventChain.chainIn(e);
+                    }
                 },
                 onWheel: (event) => {
+                    if (!KEY_BINDINGS.matches('onGesture', 'sliderRelativeWheel', 'wheel')) {
+                        return;
+                    }
                     event.event?.preventDefault();
                     let sliderValue = valueToSliderValue(this.config, this.value);
                     sliderValue = BB.clamp(sliderValue - event.deltaY / 40, 0, 1);

@@ -61,6 +61,8 @@ export class FileUi {
     // from params
     private exportType: TExportType;
     private readonly applyUncommitted: () => void;
+    private readonly onUpload: () => void;
+    private readonly onOpenBrowserStorage: () => void;
 
     private readonly rootEl: HTMLDivElement;
     private openInput: undefined | HTMLInputElement;
@@ -86,6 +88,8 @@ export class FileUi {
     constructor(p: TFileUiParams) {
         this.exportType = p.exportType;
         this.applyUncommitted = p.applyUncommitted;
+        this.onUpload = p.onUpload;
+        this.onOpenBrowserStorage = p.onOpenBrowserStorage;
 
         this.rootEl = document.createElement('div');
 
@@ -388,5 +392,17 @@ export class FileUi {
 
     triggerPlace(): void {
         this.placeInput && this.placeInput.click();
+    }
+
+    triggerUpload(): void {
+        this.onUpload();
+    }
+
+    triggerRecovery(): void {
+        showRecoveryManagerPanel(this.klRecoveryManager);
+    }
+
+    triggerOpenBrowserStorage(): void {
+        this.onOpenBrowserStorage();
     }
 }

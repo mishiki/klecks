@@ -214,3 +214,22 @@ the embed-version.
 
 bitbof © 2026 - Released under the MIT License. Icons by bitbof are public domain (excluding the Klecks logo, bitbof logo).
 While Kleki and Klecks are jointly developed, Kleki's license is separate from Klecks. Kleki at [kleki.com](https://kleki.com) is free to use, but the name and brand "Kleki" are not covered by this license — you may not use Klecks to offer a service branded or presented as "Kleki" without a license from bitbof.
+
+## Personal keybindings
+
+Settings has Import, Export, and Reset buttons for a JSON5 keybindings file.
+`keybindings.current.json5` contains the full default catalog, including unassigned actions.
+Edit the file externally, then import it; changes apply immediately and persist in this browser.
+Import the same file on another device to share the assignments.
+
+- `onPress`: commands executed when a key is pressed.
+- `whileHeld`: temporary tools and modifiers active while held.
+- `onGesture`: mouse/touch controls. Most entries enable or disable the existing gesture;
+  `sliderRelativeMouse` also accepts MouseLeft, MouseMiddle, or MouseRight.
+- `[]` disables an assignment. An omitted entry inherits its default.
+- Duplicate command keys and invalid entries are rejected without replacing the current settings.
+
+For example, change `brushBlend` to `["F2"]` to select the watercolor brush directly,
+`openFile` to `["Ctrl+O"]`, or `placeFile` to `["Ctrl+Shift+O"]`.
+Temporary canvas tools accept a key combination or a single MouseLeft/MouseMiddle/MouseRight button.
+Browser/OS-reserved shortcuts may not reach the application. Help shows the default shortcuts.

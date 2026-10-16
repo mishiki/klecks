@@ -1,5 +1,6 @@
 import { BB } from '../../../../bb/bb';
 import { TPointerEvent } from '../../../../bb/input/event.types';
+import { KEY_BINDINGS } from '../../../../bb/input/keybindings';
 import { TVector2D } from '../../../../bb/bb-types';
 import { TViewportTransform } from '../../project-viewport/project-viewport';
 import { createMatrixFromTransform } from '../../../../bb/transform/create-matrix-from-transform';
@@ -134,7 +135,7 @@ export class EaselRotate implements TEaselTool {
             });
             const dAngleDeg = ((newAngleRad - startAngleRad) / Math.PI) * 180;
             let newAngleDeg = this.downTransform.angleDeg + dAngleDeg;
-            if (this.easel.isKeyPressed('shift')) {
+            if (KEY_BINDINGS.held('rotateSnap', this.easel.keyListener.getComboStr())) {
                 newAngleDeg = Math.round(newAngleDeg / 45) * 45;
             }
             newAngleDeg = minimizeAngleDeg(newAngleDeg);
@@ -150,7 +151,7 @@ export class EaselRotate implements TEaselTool {
                     newAngleDeg,
                     this.downTransform.isMirrored,
                 ),
-                !this.easel.isKeyPressed('shift'),
+                !KEY_BINDINGS.held('rotateSnap', this.easel.keyListener.getComboStr()),
             );
             this.easel.requestRender();
         } else if (e.type === 'pointerup' && this.downPos) {
@@ -174,20 +175,6 @@ export class EaselRotate implements TEaselTool {
         const { width, height } = this.easel.getSize();
         this.compass.setAttribute('transform', 'translate(' + width / 2 + ', ' + height / 2 + ')');
         this.onUpdateTransform(this.easel.getTransform());
-    }
-
-    onKeyDown(keyStr: string, event: KeyboardEvent, comboStr: string) {
-        if (['r+left', 'r+right'].includes(comboStr)) {
-            if (keyStr === 'left') {
-                this.easel.setAngleDeg(-15, true);
-            }
-            if (keyStr === 'right') {
-                this.easel.setAngleDeg(15, true);
-            }
-        }
-        if (['r+up'].includes(comboStr)) {
-            this.easel.setAngleDeg(0, false);
-        }
     }
 
     onResize(width: number, height: number): void {

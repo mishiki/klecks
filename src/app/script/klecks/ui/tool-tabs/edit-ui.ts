@@ -56,6 +56,7 @@ export class EditUi {
     private readonly onPaste: () => void;
 
     private readonly rootEl: HTMLDivElement;
+    private readonly filterButtonMap = new Map<string, HTMLButtonElement>();
     private isInit = false;
 
     private testHasWebGL(): boolean {
@@ -297,6 +298,7 @@ This has been reported to Google.
                 button.disabled = true;
             }
 
+            this.filterButtonMap.set(filterKey, button);
             buttons.push(button);
             return button;
         };
@@ -420,5 +422,13 @@ This has been reported to Google.
 
     hide(): void {
         this.rootEl.style.display = 'none';
+    }
+
+    /** Run an Edit tab filter through the same dialog and guards as its button. */
+    triggerFilter(filterKey: string): void {
+        if (!this.isInit) {
+            this.init();
+        }
+        this.filterButtonMap.get(filterKey)?.click();
     }
 }

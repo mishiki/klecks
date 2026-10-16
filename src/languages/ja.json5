@@ -1755,6 +1755,42 @@
     original: 'Always pixelated zoom',
     value: ''
   },
+  'settings-keybindings-title': {
+    original: 'Key bindings',
+    value: 'キーバインド'
+  },
+  'settings-keybindings-description': {
+    original: 'Import or export a JSON5 file. Edit it in a text editor; changes take effect immediately.',
+    value: 'JSON5ファイルを読み込み・書き出しします。テキストエディタで編集でき、変更はすぐ反映されます。'
+  },
+  'settings-keybindings-import': {
+    original: 'Import',
+    value: '読み込み'
+  },
+  'settings-keybindings-export': {
+    original: 'Export',
+    value: '書き出し'
+  },
+  'settings-keybindings-exported': {
+    original: 'Key bindings exported.',
+    value: 'キーバインドを書き出しました。'
+  },
+  'settings-keybindings-reset': {
+    original: 'Reset',
+    value: '初期設定に戻す'
+  },
+  'settings-keybindings-reset-done': {
+    original: 'Key bindings reset to defaults.',
+    value: 'キーバインドを初期設定に戻しました。'
+  },
+  'settings-keybindings-imported': {
+    original: 'Key bindings imported.',
+    value: 'キーバインドを読み込みました。'
+  },
+  'settings-keybindings-too-large': {
+    original: 'The key settings file must be 256 KB or smaller.',
+    value: 'キーバインド設定ファイルは256KB以下にしてください。'
+  },
   'settings-save-reminder-label': {
     original: 'Save Reminder',
     value: ''

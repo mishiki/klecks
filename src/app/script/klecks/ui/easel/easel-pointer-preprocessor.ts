@@ -8,7 +8,10 @@ import { TPointerEvent, TPointerType } from '../../../bb/input/event.types';
 
 export type TEaselPointerPreprocessor = {
     onChainOut: (e: TPointerEvent) => void;
-    onDoubleTap: (e: TDoubleTapperEvent) => void;
+    onDoubleTap: (
+        e: TDoubleTapperEvent,
+        gesture: 'double-tap' | 'mouse-middle-double-tap',
+    ) => void;
     onUndo?: () => void;
     onRedo?: () => void;
     onPinch: (e: TPinchZoomerEvent) => void;
@@ -44,9 +47,13 @@ export class EaselPointerPreprocessor {
             });
             nFingerSubChain.push(this.threeFingerTap as TChainElement);
         }
-        this.mainDoubleTapper = new BB.DoubleTapper({ onDoubleTap: p.onDoubleTap });
+        this.mainDoubleTapper = new BB.DoubleTapper({
+            onDoubleTap: (e) => p.onDoubleTap(e, 'double-tap'),
+        });
         this.mainDoubleTapper.setAllowedPointerTypeArr(['touch']);
-        this.middleDoubleTapper = new BB.DoubleTapper({ onDoubleTap: p.onDoubleTap });
+        this.middleDoubleTapper = new BB.DoubleTapper({
+            onDoubleTap: (e) => p.onDoubleTap(e, 'mouse-middle-double-tap'),
+        });
         this.middleDoubleTapper.setAllowedButtonArr(['middle']);
         this.pinchZoomer = new BB.PinchZoomer({
             onPinch: p.onPinch,

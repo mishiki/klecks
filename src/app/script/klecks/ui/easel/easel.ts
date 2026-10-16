@@ -1,3 +1,4 @@
+import { EASEL_PRESS_DEFAULTS } from '../../../bb/input/keybindings-easel-defaults';
 import { DIAGNOSTICS } from '../../../bb/diagnostics/diagnostics';
 import { traceAppPointer } from '../../../bb/diagnostics/trace-app-pointer';
 import { c } from '../../../bb/base/c';
@@ -10,6 +11,7 @@ import { createMatrixFromTransform } from '../../../bb/transform/create-matrix-f
 import { applyToPoint, inverse } from 'transformation-matrix';
 import { EaselPointerPreprocessor } from './easel-pointer-preprocessor';
 import { KeyListener } from '../../../bb/input/key-listener';
+import { KEY_BINDINGS } from '../../../bb/input/keybindings';
 import {
     TArrowKey,
     TEaselInterface,
@@ -27,7 +29,6 @@ import {
     EASEL_MAX_SCALE,
     EASEL_MIN_SCALE,
     TEMP_TRIGGERS,
-    TEMP_TRIGGERS_KEYS,
 } from './easel.config';
 import { isTransformEqual } from '../project-viewport/utils/is-transform-equal';
 import { blendTransform } from '../project-viewport/utils/blend-transform';
@@ -43,6 +44,24 @@ function getToolEntries<GToolId extends string>(
 ): [GToolId, TEaselTool][] {
     return Object.entries(tools) as [GToolId, TEaselTool][];
 }
+
+// The trigger names are kept on tools for their internal type contract.  The
+// user-facing action names live in keybindings-easel-defaults.ts and are used
+// here so a multi-key held binding can replace the historical single key.
+const TEMP_TRIGGER_ACTIONS: Record<TEaselToolTrigger, string> = {
+    'mouse-middle': 'hand',
+    'mouse-right': 'eyedropper',
+    space: 'hand',
+    alt: 'eyedropper',
+    r: 'rotateView',
+    z: 'zoom',
+};
+const TEMP_ACTION_PRIMARY_TRIGGERS: Record<string, TEaselToolTrigger> = {
+    eyedropper: 'alt',
+    hand: 'space',
+    rotateView: 'r',
+    zoom: 'z',
+};
 
 export type TEaselParams<GToolId extends string> = {
     width: number; // size of DOM element
@@ -74,6 +93,7 @@ export class Easel<GToolId extends string> {
     private readonly windowPointerListener: (e: PointerEvent) => void;
     private readonly keyListener: KeyListener;
     private readonly selectionRenderer: SelectionRenderer;
+    private unsubscribeKeyBindings: (() => void) | undefined;
 
     // from params
     private readonly toolsMap: TEaselParams<GToolId>['tools'];
@@ -144,6 +164,26 @@ export class Easel<GToolId extends string> {
             this.toolsMap[this.tempToolId ?? this.toolId].doubleTapPointerTypes ??
             DEFAULT_DOUBLE_TAP_POINTER_TYPES;
         this.pointerPreprocessor.setDoubleTapPointerTypes(pointerTypes);
+    }
+
+    private getTempToolIdForAction(action: string): GToolId | undefined {
+        const trigger = TEMP_ACTION_PRIMARY_TRIGGERS[action];
+        return trigger === undefined ? undefined : this.tempTools[trigger];
+    }
+
+    private getTempTriggerForAction(action: string): TEaselToolTrigger | undefined {
+        return TEMP_ACTION_PRIMARY_TRIGGERS[action];
+    }
+
+    private isActiveTempBindingHeld(comboStr: string): boolean {
+        if (this.tempToolId === undefined) {
+            return false;
+        }
+        return (Object.keys(TEMP_ACTION_PRIMARY_TRIGGERS) as string[]).some(
+            (action) =>
+                this.getTempToolIdForAction(action) === this.tempToolId &&
+                KEY_BINDINGS.held(action, comboStr),
+        );
     }
 
     private lastFrameTimestamp: number = 0;
@@ -273,6 +313,9 @@ export class Easel<GToolId extends string> {
     }
 
     private readonly onWheel = (e: TWheelEvent): void => {
+        if (!KEY_BINDINGS.matches('onGesture', 'wheelZoom', 'wheel')) {
+            return;
+        }
         e.event?.preventDefault();
         let isImmediate = false;
         if (Math.abs(e.deltaY) < 0.8) {
@@ -286,7 +329,7 @@ export class Easel<GToolId extends string> {
             }
             e.deltaY *= factor;
         }
-        if (this.keyListener.isPressed('shift')) {
+        if (KEY_BINDINGS.held('wheelFine', this.keyListener.getComboStr())) {
             e.deltaY /= 4;
         }
 
@@ -363,13 +406,36 @@ export class Easel<GToolId extends string> {
             tool.onResize?.(this.width, this.height);
         });
 
-        let mouseMiddleIsDown = false;
+        let mouseTempToolId: GToolId | undefined;
 
         let angleIsExtraSticky = false;
         this.pointerPreprocessor = new EaselPointerPreprocessor({
-            onUndo: this.onUndo,
-            onRedo: this.onRedo,
+            onUndo: () => {
+                if (KEY_BINDINGS.matches('onGesture', 'touchTwoFingerUndo', 'touch-two-finger-tap')) {
+                    this.onUndo?.();
+                }
+            },
+            onRedo: () => {
+                if (
+                    KEY_BINDINGS.matches(
+                        'onGesture',
+                        'touchThreeFingerRedo',
+                        'touch-three-finger-tap',
+                    )
+                ) {
+                    this.onRedo?.();
+                }
+            },
             onPinch: (event) => {
+                if (
+                    !KEY_BINDINGS.matches(
+                        'onGesture',
+                        'touchTwoFingerTransform',
+                        'touch-two-finger-transform',
+                    )
+                ) {
+                    return;
+                }
                 if (DIAGNOSTICS.isRecording()) {
                     DIAGNOSTICS.record('easel.gesture.pinch', { type: event.type });
                 }
@@ -417,7 +483,18 @@ export class Easel<GToolId extends string> {
                     this.pinchInitialTransform = undefined;
                 }
             },
-            onDoubleTap: (e) => {
+            onDoubleTap: (e, gesture) => {
+                const action =
+                    gesture === 'mouse-middle-double-tap'
+                        ? 'mouseMiddleDoubleTapFit'
+                        : 'doubleTapFit';
+                const gestureToken =
+                    gesture === 'mouse-middle-double-tap'
+                        ? 'mouse-middle-double-tap'
+                        : 'double-tap';
+                if (!KEY_BINDINGS.matches('onGesture', action, gestureToken)) {
+                    return;
+                }
                 if (this.fitTransform()) {
                     this.requestRender();
                 } else {
@@ -434,21 +511,28 @@ export class Easel<GToolId extends string> {
                     y: e.relY,
                 };
                 if (e.type === 'pointerdown') {
-                    if (e.button === 'middle') {
-                        mouseMiddleIsDown = true;
-                        this.pushTempTool(this.tempTools['mouse-middle']);
+                    const button = e.button ? 'Mouse' + e.button : '';
+                    const action = ['eyedropper', 'hand', 'rotateView', 'zoom'].find(
+                        (candidate) => KEY_BINDINGS.matches('whileHeld', candidate, button),
+                    );
+                    if (action) {
+                        mouseTempToolId = this.getTempToolIdForAction(action);
+                        this.pushTempTool(mouseTempToolId);
                     }
                 } else if (e.type === 'pointermove') {
                     // noop?
                 } else if (e.type === 'pointerup') {
-                    if (mouseMiddleIsDown) {
-                        mouseMiddleIsDown = false;
+                    if (mouseTempToolId !== undefined) {
                         this.getActiveTool().onPointer(e);
-                        this.popTempTool(this.tempTools['mouse-middle']);
+                        this.popTempTool(mouseTempToolId);
+                        mouseTempToolId = undefined;
                         return;
                     }
                 }
-                this.getActiveTool().onPointer(e);
+                // Temporary mouse tools interpret the configured button as their primary drag.
+                this.getActiveTool().onPointer(mouseTempToolId !== undefined && e.button
+                    ? { ...e, button: 'left' }
+                    : e);
             },
         });
         /*
@@ -524,29 +608,37 @@ export class Easel<GToolId extends string> {
                     return;
                 }
 
-                if (comboStr === 'plus') {
+                if (Object.keys(EASEL_PRESS_DEFAULTS).some((action) => KEY_BINDINGS.matches('onPress', action, comboStr)) ||
+                    ['eyedropper', 'hand', 'rotateView', 'zoom'].some((action) => KEY_BINDINGS.matches('whileHeld', action, comboStr))) {
+                    e.preventDefault();
+                }
+
+                if (KEY_BINDINGS.matches('onPress', 'zoomIn', comboStr)) {
                     const oldScale = this.getTransform().scale;
                     const newScale = zoomByStep(
                         oldScale,
-                        this.keyListener.isPressed('shift') ? 1 / 8 : 1 / 2,
+                        KEY_BINDINGS.held('zoomFine', comboStr) ? 1 / 8 : 1 / 2,
                     );
                     this.scale(newScale / oldScale);
                 }
-                if (comboStr === 'minus') {
+                if (KEY_BINDINGS.matches('onPress', 'zoomOut', comboStr)) {
                     const oldScale = this.getTransform().scale;
                     const newScale = zoomByStep(
                         oldScale,
-                        this.keyListener.isPressed('shift') ? -1 / 8 : -1 / 2,
+                        KEY_BINDINGS.held('zoomFine', comboStr) ? -1 / 8 : -1 / 2,
                     );
                     this.scale(newScale / oldScale);
                 }
-                if (
-                    comboStr !== 'shift' &&
-                    this.keyListener.comboOnlyContains(['shift', 'left', 'right', 'up', 'down'])
-                ) {
-                    const arrowKey = comboStr
-                        .split('+')
-                        .find((item) => item !== 'shift')! as TArrowKey;
+                const arrowAction = (
+                    [
+                        ['left', 'panLeft'],
+                        ['right', 'panRight'],
+                        ['up', 'panUp'],
+                        ['down', 'panDown'],
+                    ] as const
+                ).find(([, action]) => KEY_BINDINGS.matches('onPress', action, comboStr));
+                if (arrowAction) {
+                    const arrowKey = arrowAction[0] as TArrowKey;
                     const activeTool = this.getActiveTool();
                     if (!activeTool.onArrowKeys?.(arrowKey)) {
                         const stepSize = 40;
@@ -565,13 +657,26 @@ export class Easel<GToolId extends string> {
                     }
                 }
 
+                if (KEY_BINDINGS.matches('onPress', 'rotateLeft', comboStr)) {
+                    this.setAngleDeg(-15, true);
+                }
+                if (KEY_BINDINGS.matches('onPress', 'rotateRight', comboStr)) {
+                    this.setAngleDeg(15, true);
+                }
+                if (KEY_BINDINGS.matches('onPress', 'resetRotation', comboStr)) {
+                    this.setAngleDeg(0, false);
+                }
+
                 // activate temporary tool
-                TEMP_TRIGGERS_KEYS.forEach((keyTrigger) => {
+                (['eyedropper', 'hand', 'rotateView', 'zoom'] as const).forEach((action) => {
+                    const keyTrigger = this.getTempTriggerForAction(action);
                     if (
-                        comboStr === keyTrigger &&
-                        this.toolsMap[this.toolId].blockTrigger !== keyTrigger
+                        keyTrigger !== undefined &&
+                        KEY_BINDINGS.matches('whileHeld', action, comboStr) &&
+                        !(this.toolsMap[this.toolId].blockTrigger === keyTrigger &&
+                            KEY_BINDINGS.held('selectionSubtract', comboStr))
                     ) {
-                        this.pushTempTool(this.tempTools[keyTrigger]);
+                        this.pushTempTool(this.getTempToolIdForAction(action));
                     }
                 });
                 const tool = this.toolsMap[this.tempToolId ?? this.toolId];
@@ -582,22 +687,40 @@ export class Easel<GToolId extends string> {
                     return;
                 }
 
-                // turn off temporary tool again
-                TEMP_TRIGGERS_KEYS.forEach((keyTrigger) => {
+                // Turn off a temporary tool when the complete held binding is
+                // released.  Checking the old combo also handles chords such
+                // as Ctrl+Space when either key is released first.
+                (['eyedropper', 'hand', 'rotateView', 'zoom'] as const).forEach((action) => {
+                    const keyTrigger = this.getTempTriggerForAction(action);
                     if (
-                        keyStr === keyTrigger &&
-                        this.toolsMap[this.toolId].blockTrigger !== keyTrigger
+                        keyTrigger !== undefined &&
+                        mouseTempToolId === undefined &&
+                        this.tempToolId === this.getTempToolIdForAction(action) &&
+                        !KEY_BINDINGS.held(action, this.keyListener.getComboStr())
                     ) {
-                        this.popTempTool(this.tempTools[keyTrigger]);
+                        this.popTempTool(this.getTempToolIdForAction(action));
                     }
                 });
                 const tool = this.toolsMap[this.tempToolId ?? this.toolId];
                 tool.onKeyUp?.(keyStr, e, oldComboStr);
             },
             onBlur: () => {
+                mouseTempToolId = undefined;
+                if (this.tempToolId !== undefined) {
+                    this.popTempTool(this.tempToolId);
+                }
                 const tool = this.toolsMap[this.tempToolId ?? this.toolId];
                 tool.onBlur?.();
             },
+        });
+        this.unsubscribeKeyBindings = KEY_BINDINGS.subscribe(() => {
+            mouseTempToolId = undefined;
+            if (
+                this.tempToolId !== undefined &&
+                !this.isActiveTempBindingHeld(this.keyListener.getComboStr())
+            ) {
+                this.popTempTool(this.tempToolId);
+            }
         });
         this.easelInterface.keyListener = this.keyListener;
 
@@ -931,6 +1054,8 @@ export class Easel<GToolId extends string> {
         this.viewport.destroy();
         this.pointerListener.destroy();
         this.keyListener.destroy();
+        this.unsubscribeKeyBindings?.();
+        this.unsubscribeKeyBindings = undefined;
         this.animationFrameId !== undefined && cancelAnimationFrame(this.animationFrameId);
         this.selectionRenderer.destroy();
         window.removeEventListener('pointerdown', this.windowPointerListener);

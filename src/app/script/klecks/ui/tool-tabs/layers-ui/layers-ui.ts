@@ -826,6 +826,157 @@ export class LayersUi {
         this.selectAfterStructure(layerIndex);
     }
 
+    private refreshAfterMaskChange(): void {
+        this.update(this.selectedSpotIndex);
+        this.createLayerList(true);
+        this.onUpdateProject();
+    }
+
+    /** Actions exposed to the application keybinding dispatcher. */
+    newLayer(): void {
+        if (this.klCanvas.isLayerLimitReached()) {
+            return;
+        }
+        this.applyUncommitted();
+        const newIndex = this.performStructuralChange(() =>
+            this.klCanvas.addLayer(this.selectedSpotIndex),
+        );
+        if (typeof newIndex === 'number') {
+            this.selectAfterStructure(newIndex);
+        }
+    }
+
+    newGroup(): void {
+        if (this.klCanvas.isLayerLimitReached()) {
+            return;
+        }
+        this.applyUncommitted();
+        const newIndex = this.performStructuralChange(() =>
+            this.klCanvas.addGroup(this.selectedSpotIndex),
+        );
+        if (typeof newIndex === 'number') {
+            this.selectAfterStructure(newIndex);
+        }
+    }
+
+    duplicateSelected(): void {
+        if (this.klCanvas.isLayerLimitReached()) {
+            return;
+        }
+        this.applyUncommitted();
+        const newIndex = this.performStructuralChange(() =>
+            this.klCanvas.duplicateLayer(this.selectedSpotIndex),
+        );
+        if (typeof newIndex === 'number') {
+            this.selectAfterStructure(newIndex);
+        }
+    }
+
+    removeSelected(): void {
+        const selected = this.klCanvasLayerArr[this.selectedSpotIndex];
+        const oneLayer = this.klCanvasLayerArr.length === 1;
+        const rasterCount = this.klCanvasLayerArr.filter((layer) => !layer.groupId).length;
+        if (!selected || oneLayer || (!selected.groupId && rasterCount <= 1)) {
+            return;
+        }
+        this.applyUncommitted();
+        const newIndex = this.performStructuralChange(() =>
+            this.klCanvas.removeLayer(this.selectedSpotIndex),
+        );
+        if (typeof newIndex === 'number') {
+            this.selectAfterStructure(newIndex);
+        }
+    }
+
+    mergeSelected(): void {
+        this.applyUncommitted();
+        this.mergeLayer();
+    }
+
+    renameSelected(): void {
+        this.applyUncommitted();
+        this.renameLayer(this.selectedSpotIndex);
+    }
+
+    toggleSelectedClipping(): void {
+        const selected = this.klCanvasLayerArr[this.selectedSpotIndex];
+        if (!selected) {
+            return;
+        }
+        this.klCanvas.setLayerHasClipping(this.selectedSpotIndex, !selected.hasClipping);
+        this.update(this.selectedSpotIndex);
+    }
+
+    clearSelected(): void {
+        if (
+            this.selectedTarget === 'image' &&
+            !this.klCanvasLayerArr[this.selectedSpotIndex]?.groupId
+        ) {
+            this.onClearLayer();
+        }
+    }
+
+    mergeAll(): void {
+        this.applyUncommitted();
+        const newIndex = this.performStructuralChange(() => this.klCanvas.mergeAll());
+        if (typeof newIndex === 'number') {
+            this.selectAfterStructure(newIndex);
+        }
+    }
+
+    addMask(): void {
+        this.applyUncommitted();
+        if (!this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
+            this.klCanvas.addLayerMask(this.selectedSpotIndex);
+            this.selectedTarget = 'mask';
+            this.onSelect(this.selectedSpotIndex, false, 'mask');
+            this.refreshAfterMaskChange();
+        }
+    }
+
+    removeMask(): void {
+        this.applyUncommitted();
+        if (this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
+            this.klCanvas.removeLayerMask(this.selectedSpotIndex);
+            this.selectedTarget = 'image';
+            this.onSelect(this.selectedSpotIndex, false, 'image');
+            this.refreshAfterMaskChange();
+        }
+    }
+
+    toggleMask(): void {
+        this.applyUncommitted();
+        const mask = this.klCanvas.getLayer(this.selectedSpotIndex).mask;
+        if (mask) {
+            this.klCanvas.setLayerMaskEnabled(this.selectedSpotIndex, !mask.enabled);
+            this.refreshAfterMaskChange();
+        }
+    }
+
+    invertMask(): void {
+        this.applyUncommitted();
+        if (this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
+            this.klCanvas.invertLayerMask(this.selectedSpotIndex);
+            this.refreshAfterMaskChange();
+        }
+    }
+
+    clearMask(): void {
+        this.applyUncommitted();
+        const context = this.klCanvas.getLayerMaskContext(this.selectedSpotIndex);
+        if (!context) {
+            return;
+        }
+        context.save();
+        context.globalCompositeOperation = 'source-over';
+        context.fillStyle = '#fff';
+        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
+        context.restore();
+        this.klCanvas.markLayerMaskChanged(this.selectedSpotIndex);
+        this.klCanvas.pushLayerMaskHistory(this.selectedSpotIndex);
+        this.refreshAfterMaskChange();
+    }
+
     // ----------------------------------- public -----------------------------------
     constructor(p: TLayersUiParams) {
         this.klCanvas = p.klCanvas;
@@ -940,65 +1091,22 @@ export class LayersUi {
             ],
             onItemClick: (id) => {
                 if (id === 'clear-layer') {
-                    if (
-                        this.selectedTarget === 'image' &&
-                        !this.klCanvasLayerArr[this.selectedSpotIndex]?.groupId
-                    ) {
-                        this.onClearLayer();
-                    }
+                    this.clearSelected();
                 }
                 if (id === 'add-mask') {
-                    this.applyUncommitted();
-                    if (!this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
-                        this.klCanvas.addLayerMask(this.selectedSpotIndex);
-                        this.selectedTarget = 'mask';
-                        this.onSelect(this.selectedSpotIndex, false, 'mask');
-                    }
+                    this.addMask();
                 }
                 if (id === 'remove-mask') {
-                    this.applyUncommitted();
-                    if (this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
-                        this.klCanvas.removeLayerMask(this.selectedSpotIndex);
-                        this.selectedTarget = 'image';
-                        this.onSelect(this.selectedSpotIndex, false, 'image');
-                    }
+                    this.removeMask();
                 }
                 if (id === 'toggle-mask') {
-                    this.applyUncommitted();
-                    const mask = this.klCanvas.getLayer(this.selectedSpotIndex).mask;
-                    if (mask) {
-                        this.klCanvas.setLayerMaskEnabled(this.selectedSpotIndex, !mask.enabled);
-                    }
+                    this.toggleMask();
                 }
                 if (id === 'invert-mask') {
-                    this.applyUncommitted();
-                    if (this.klCanvas.getLayer(this.selectedSpotIndex).mask) {
-                        this.klCanvas.invertLayerMask(this.selectedSpotIndex);
-                    }
+                    this.invertMask();
                 }
                 if (id === 'clear-mask') {
-                    this.applyUncommitted();
-                    const context = this.klCanvas.getLayerMaskContext(this.selectedSpotIndex);
-                    if (context) {
-                        context.save();
-                        context.globalCompositeOperation = 'source-over';
-                        context.fillStyle = '#fff';
-                        context.fillRect(0, 0, context.canvas.width, context.canvas.height);
-                        context.restore();
-                        this.klCanvas.markLayerMaskChanged(this.selectedSpotIndex);
-                        this.klCanvas.pushLayerMaskHistory(this.selectedSpotIndex);
-                    }
-                }
-                if (
-                    id === 'add-mask' ||
-                    id === 'remove-mask' ||
-                    id === 'toggle-mask' ||
-                    id === 'invert-mask' ||
-                    id === 'clear-mask'
-                ) {
-                    this.update(this.selectedSpotIndex);
-                    this.createLayerList(true);
-                    this.onUpdateProject();
+                    this.clearMask();
                 }
                 if (id === 'advanced-merge') {
                     if (this.canMergeSelected()) {
@@ -1006,12 +1114,7 @@ export class LayersUi {
                     }
                 }
                 if (id === 'merge-all') {
-                    this.applyUncommitted();
-                    const newIndex = this.performStructuralChange(() => this.klCanvas.mergeAll());
-                    if (typeof newIndex !== 'number') {
-                        return;
-                    }
-                    this.selectAfterStructure(newIndex);
+                    this.mergeAll();
                 }
             },
         });
@@ -1075,48 +1178,19 @@ export class LayersUi {
                 );
 
                 this.addBtn.onclick = () => {
-                    this.applyUncommitted();
-                    const newIndex = this.performStructuralChange(() =>
-                        this.klCanvas.addLayer(this.selectedSpotIndex),
-                    );
-                    if (typeof newIndex !== 'number') {
-                        return;
-                    }
-                    this.selectAfterStructure(newIndex);
+                    this.newLayer();
                 };
                 this.addGroupBtn.onclick = () => {
-                    this.applyUncommitted();
-                    const newIndex = this.performStructuralChange(() =>
-                        this.klCanvas.addGroup(this.selectedSpotIndex),
-                    );
-                    if (typeof newIndex !== 'number') {
-                        return;
-                    }
-                    this.selectAfterStructure(newIndex);
+                    this.newGroup();
                 };
                 this.duplicateBtn.onclick = () => {
-                    this.applyUncommitted();
-                    const newIndex = this.performStructuralChange(() =>
-                        this.klCanvas.duplicateLayer(this.selectedSpotIndex),
-                    );
-                    if (typeof newIndex !== 'number') {
-                        return;
-                    }
-                    this.selectAfterStructure(newIndex);
+                    this.duplicateSelected();
                 };
                 this.removeBtn.onclick = () => {
-                    this.applyUncommitted();
-                    const newIndex = this.performStructuralChange(() =>
-                        this.klCanvas.removeLayer(this.selectedSpotIndex),
-                    );
-                    if (typeof newIndex !== 'number') {
-                        return;
-                    }
-                    this.selectAfterStructure(newIndex);
+                    this.removeSelected();
                 };
                 this.mergeBtn.onclick = () => {
-                    this.applyUncommitted();
-                    this.mergeLayer();
+                    this.mergeSelected();
                 };
 
             };

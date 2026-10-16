@@ -1,6 +1,7 @@
 import { traceAppPointer } from '../../../../bb/diagnostics/trace-app-pointer';
 import { BB } from '../../../../bb/bb';
 import { TPointerEvent } from '../../../../bb/input/event.types';
+import { KEY_BINDINGS } from '../../../../bb/input/keybindings';
 import { createMatrixFromTransform } from '../../../../bb/transform/create-matrix-from-transform';
 import { applyToPoint, inverse } from 'transformation-matrix';
 import {
@@ -83,7 +84,10 @@ export class EaselBrush implements TEaselTool {
 
         const pressure = e.pressure ?? 1;
         const isCoalesced = e.isCoalesced;
-        const shiftIsPressed = this.easel.keyListener.isPressed('shift');
+        const shiftIsPressed = KEY_BINDINGS.held(
+            'lineTool',
+            this.easel.keyListener.getComboStr(),
+        );
 
         if (shiftIsPressed && !this.firstShiftPos) {
             this.firstShiftPos = { x: e.relX, y: e.relY };

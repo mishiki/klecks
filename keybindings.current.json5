@@ -1,0 +1,260 @@
+// Klecks key settings (JSON5). Edit and import in Settings.
+// onPress: execute; whileHeld: hold tool/modifier; onGesture: mouse/touch controls.
+// [] disables an action; omitted actions use defaults. Duplicate onPress keys are rejected.
+// Browser/OS-reserved shortcuts may not reach the app.
+{
+  "onPress": {
+    "fitView": [
+      "Home"
+    ],
+    "resetView": [
+      "End"
+    ],
+    "undo": [
+      "Ctrl+Z",
+      "Cmd+Z"
+    ],
+    "redo": [
+      "Ctrl+Y",
+      "Cmd+Y",
+      "Ctrl+Shift+Z",
+      "Cmd+Shift+Z"
+    ],
+    "save": [
+      "Ctrl+S",
+      "Cmd+S"
+    ],
+    "saveProject": [
+      "Ctrl+S+Shift",
+      "Cmd+S+Shift"
+    ],
+    "copy": [
+      "C+Ctrl",
+      "C+Cmd"
+    ],
+    "preventNativeSelectAll": [
+      "A+Ctrl",
+      "A+Cmd"
+    ],
+    "decreaseBrushSize": [
+      "["
+    ],
+    "increaseBrushSize": [
+      "]"
+    ],
+    "fillLayer": [
+      "Enter"
+    ],
+    "cancel": [
+      "Escape"
+    ],
+    "clearLayer": [
+      "Delete",
+      "Backspace"
+    ],
+    "advancedMerge": [
+      "Ctrl+E+Shift",
+      "Cmd+E+Shift"
+    ],
+    "toggleEraser": [
+      "E+Shift"
+    ],
+    "eraserBrush": [
+      "E"
+    ],
+    "nextBrush": [
+      "B"
+    ],
+    "handTool": [
+      "H"
+    ],
+    "togglePaintBucketGradient": [
+      "G"
+    ],
+    "textTool": [
+      "T"
+    ],
+    "shapeTool": [
+      "U"
+    ],
+    "selectTool": [
+      "L"
+    ],
+    "swapColors": [
+      "X"
+    ],
+    "flipView": [
+      "M"
+    ],
+    "newImage": [],
+    "openFile": [],
+    "placeFile": [],
+    "savePsd": [],
+    "shareImage": [],
+    "openHome": [],
+    "openHelp": [],
+    "openBrowserStorage": [],
+    "openRecovery": [],
+    "uploadImage": [],
+    "showFileTab": [],
+    "showLayersTab": [],
+    "showEditTab": [],
+    "showSettingsTab": [],
+    "paste": [],
+    "toolBrush": [],
+    "toolHand": [],
+    "toolPaintBucket": [],
+    "toolGradient": [],
+    "toolText": [],
+    "toolShape": [],
+    "toolSelect": [],
+    "toolTransform": [],
+    "toolEyedropper": [],
+    "toolRotate": [],
+    "toolZoom": [],
+    "brushPen": [],
+    "brushBlend": [],
+    "brushSketchy": [],
+    "brushPixel": [],
+    "brushChemy": [],
+    "brushSmudge": [],
+    "brushEraser": [],
+    "layerNew": [],
+    "layerNewGroup": [],
+    "layerDuplicate": [],
+    "layerRemove": [],
+    "layerMerge": [],
+    "layerRename": [],
+    "layerToggleClipping": [],
+    "layerClear": [],
+    "layerMergeAll": [],
+    "layerAddMask": [],
+    "layerRemoveMask": [],
+    "layerToggleMask": [],
+    "layerInvertMask": [],
+    "layerClearMask": [],
+    "filterCropExtend": [],
+    "filterFlip": [],
+    "filterPerspective": [],
+    "filterResize": [],
+    "filterRotate": [],
+    "filterTransform": [],
+    "filterBrightnessContrast": [],
+    "filterCurves": [],
+    "filterDistort": [],
+    "filterHueSaturation": [],
+    "filterInvert": [],
+    "filterTiltShift": [],
+    "filterToAlpha": [],
+    "filterBlur": [],
+    "filterUnsharpMask": [],
+    "filterGrid": [],
+    "filterNoise": [],
+    "filterPattern": [],
+    "filterVanishPoint": [],
+    "zoomIn": [
+      "Plus",
+      "Plus+Shift"
+    ],
+    "zoomOut": [
+      "-"
+    ],
+    "panLeft": [
+      "ArrowLeft",
+      "ArrowLeft+Shift"
+    ],
+    "panRight": [
+      "ArrowRight",
+      "ArrowRight+Shift"
+    ],
+    "panUp": [
+      "ArrowUp",
+      "Shift+ArrowUp"
+    ],
+    "panDown": [
+      "ArrowDown",
+      "ArrowDown+Shift"
+    ],
+    "rotateLeft": [
+      "ArrowLeft+R"
+    ],
+    "rotateRight": [
+      "R+ArrowRight"
+    ],
+    "resetRotation": [
+      "R+ArrowUp"
+    ]
+  },
+  "whileHeld": {
+    "eyedropper": [
+      "Alt"
+    ],
+    "hand": [
+      "Space",
+      "MouseMiddle"
+    ],
+    "rotateView": [
+      "R"
+    ],
+    "zoom": [
+      "Z"
+    ],
+    "lineTool": [
+      "Shift"
+    ],
+    "rotateSnap": [
+      "Shift"
+    ],
+    "selectionAdd": [
+      "Shift"
+    ],
+    "selectionSubtract": [
+      "Alt"
+    ],
+    "selectionNudgeFine": [
+      "Shift"
+    ],
+    "wheelFine": [
+      "Shift"
+    ],
+    "zoomFine": [
+      "Shift"
+    ],
+    "hudColorPicker": [
+      "Alt+Ctrl",
+      "Alt+Cmd"
+    ]
+  },
+  "onGesture": {
+    "wheelZoom": [
+      "wheel"
+    ],
+    "doubleTapFit": [
+      "doubletap"
+    ],
+    "mouseMiddleDoubleTapFit": [
+      "mousemiddledoubletap"
+    ],
+    "touchTwoFingerTransform": [
+      "touchtwofingertransform"
+    ],
+    "touchTwoFingerUndo": [
+      "touchtwofingertap"
+    ],
+    "touchThreeFingerRedo": [
+      "touchthreefingertap"
+    ],
+    "sliderRelativeMouse": [
+      "mouseright"
+    ],
+    "sliderRelativeWheel": [
+      "wheel"
+    ],
+    "sliderManualInput": [
+      "doubletap"
+    ],
+    "sliderFineGrained": [
+      "verticalfine"
+    ]
+  }
+}

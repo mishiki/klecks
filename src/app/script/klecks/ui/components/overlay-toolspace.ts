@@ -6,6 +6,7 @@ import { LANG } from '../../../language/language';
 import { TRgb } from '../../kl-types';
 import { TVector2D } from '../../../bb/bb-types';
 import { css } from '../../../bb/base/base';
+import { KEY_BINDINGS } from '../../../bb/input/keybindings';
 
 /**
  * Compressed HUD toolspace. When you hold ctrl+alt.
@@ -168,6 +169,15 @@ export class OverlayToolspace {
             }
         };
 
+        const closeHud = (): void => {
+            if (!isVisible) {
+                return;
+            }
+            isVisible = false;
+            colorSlider.end();
+            updateUI();
+        };
+
         let mousePos: TVector2D | null = null;
         document.addEventListener(
             'pointermove',
@@ -180,14 +190,20 @@ export class OverlayToolspace {
             { passive: false },
         );
 
-        const keyListener = new BB.KeyListener({
+        let currentComboStr = '';
+        new BB.KeyListener({
             onDown: (keyStr, event, comboStr, isRepeat) => {
+                currentComboStr = comboStr;
                 if (isRepeat) {
                     return;
                 }
                 if (isVisible) {
-                    isVisible = false;
-                    updateUI();
+                    // Keep the HUD open when another modifier is added, but
+                    // close it if the configured held binding is no longer
+                    // present in the current combo.
+                    if (!KEY_BINDINGS.held('hudColorPicker', comboStr)) {
+                        closeHud();
+                    }
                     return;
                 }
 
@@ -195,7 +211,7 @@ export class OverlayToolspace {
                     return;
                 }
 
-                if (['ctrl+alt', 'cmd+alt', 'alt+ctrl', 'alt+cmd'].includes(comboStr)) {
+                if (KEY_BINDINGS.held('hudColorPicker', comboStr, true)) {
                     event.preventDefault();
                     isVisible = true;
 
@@ -216,22 +232,24 @@ export class OverlayToolspace {
                 }
             },
             onUp: (keyStr, event, oldComboStr) => {
-                if (
-                    ['ctrl+alt', 'cmd+alt', 'alt+ctrl', 'alt+cmd'].includes(oldComboStr) &&
-                    isVisible
-                ) {
-                    isVisible = false;
-                    colorSlider.end();
-                    updateUI();
+                currentComboStr = oldComboStr
+                    .split('+')
+                    .filter((key) => key !== keyStr)
+                    .join('+');
+                if (isVisible && !KEY_BINDINGS.held('hudColorPicker', currentComboStr)) {
+                    closeHud();
                 }
             },
             onBlur: () => {
-                if (isVisible) {
-                    isVisible = false;
-                    colorSlider.end();
-                    updateUI();
-                }
+                currentComboStr = '';
+                closeHud();
             },
+        });
+
+        KEY_BINDINGS.subscribe(() => {
+            if (isVisible && !KEY_BINDINGS.held('hudColorPicker', currentComboStr)) {
+                closeHud();
+            }
         });
     }
 

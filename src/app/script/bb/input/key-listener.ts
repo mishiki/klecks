@@ -27,7 +27,7 @@ const globalKey = ((): TGlobalKey => {
     // key - KeyboardEvent.key
     // code - KeyboardEvent.code
 
-    const keyStrToKeyObj = {
+    const keyStrToKeyObj: Record<string, string | string[]> = {
         // keyStr not to contain a '+', because that's used for the comboStr
         space: [' '],
         alt: ['Alt', 'AltGraph'],
@@ -65,6 +65,17 @@ const globalKey = ((): TGlobalKey => {
         home: 'Home',
         end: 'End',
     };
+
+    // Configurable shortcuts may use keys that the original fixed mapping did not need.
+    for (const key of 'abcdefghijklmnopqrstuvwxyz0123456789') {
+        keyStrToKeyObj[key] = [key, key.toUpperCase()];
+    }
+    for (let i = 1; i <= 24; i++) keyStrToKeyObj['f' + i] = 'F' + i;
+    Object.assign(keyStrToKeyObj, {
+        tab: 'Tab', pageup: 'PageUp', pagedown: 'PageDown', insert: 'Insert',
+        equals: '=', comma: ',', period: '.', slash: '/', semicolon: ';',
+        quote: "'", backquote: String.fromCharCode(96), backslash: String.fromCharCode(92),
+    });
 
     // ['space', 'alt', ... ]
     const keyStrArr = Object.keys(keyStrToKeyObj);
@@ -140,8 +151,16 @@ const globalKey = ((): TGlobalKey => {
     };
 
     function keyDown(e: KeyboardEvent): void {
-        const key = e.key;
         const code = e.code;
+        const codeFallback: Record<string, string> = {
+            BracketLeft: '[', BracketRight: ']', Equal: '=', Minus: '-',
+            Comma: ',', Period: '.', Slash: '/', Semicolon: ';', Quote: "'",
+            Backquote: String.fromCharCode(96), Backslash: String.fromCharCode(92),
+        };
+        const baseKey = /^Key[A-Z]$/.test(code) ? code.slice(3).toLowerCase()
+            : /^Digit[0-9]$/.test(code) ? code.slice(5) : codeFallback[code];
+        // Shift can change event.key (for example 1 -> !); retain assignable base keys.
+        const key = e.key in keyToKeyStrObj ? e.key : (baseKey ?? e.key);
 
         if (key in keyToKeyStrObj) {
             const keyStr = keyToKeyStrObj[key];
