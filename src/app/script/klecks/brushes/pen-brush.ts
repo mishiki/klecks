@@ -362,7 +362,7 @@ export class PenBrush {
 
         this.bezierLine = null;
 
-        if (this.changedTiles.some((item) => item)) {
+        if (!this.klHistory.isPaused() && this.changedTiles.some((item) => item)) {
             this.klHistory.push(
                 getPushableLayerChange(
                     this.klHistory.getComposed(),
@@ -412,7 +412,7 @@ export class PenBrush {
         }
         this.context.restore();
 
-        if (this.changedTiles.some((item) => item)) {
+        if (!this.klHistory.isPaused() && this.changedTiles.some((item) => item)) {
             this.klHistory.push(
                 getPushableLayerChange(
                     this.klHistory.getComposed(),

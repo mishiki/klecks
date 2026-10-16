@@ -73,6 +73,7 @@ import { requestPersistentStorage } from '../klecks/storage/request-persistent-s
 import { CrossTabChannel } from '../bb/base/cross-tab-channel';
 import { MobileColorUi } from '../klecks/ui/mobile/mobile-color-ui';
 import { PixelBrush } from '../klecks/brushes/pixel-brush';
+import { BlendBrush } from '../klecks/brushes/blend-brush';
 import { PenBrush } from '../klecks/brushes/pen-brush';
 import { getSelectionPath2d } from '../bb/multi-polygon/get-selection-path-2d';
 import { ToolspaceTopRow } from '../klecks/ui/components/toolspace-top-row';
@@ -415,10 +416,36 @@ export class KlApp {
         let currentLayerIndex: number = this.klCanvas.getLayerCount() - 1;
         let currentLayerTarget: TLayerEditTarget = 'image';
         let maskControls: HTMLElement | undefined;
-        const maskBrush = new PenBrush();
-        maskBrush.setHistory(this.klHistory);
+        const maskEraserBrush = new PenBrush();
+        maskEraserBrush.setHistory(this.klHistory);
+        let maskBrush: PenBrush | BlendBrush = maskEraserBrush;
         let maskStrokeActive = false;
         let maskStrokeLayerIndex = -1;
+        const supportsMaskBrush = (id: TBrushId) =>
+            id === 'penBrush' || id === 'blendBrush' || id === 'eraserBrush';
+        const restoreImageBrush = () => {
+            currentBrushUi.setLayer(this.klCanvas.getLayer(currentLayerIndex));
+            currentBrushUi.setColor(currentColor);
+        };
+        const prepareMaskBrush = () => {
+            const context = this.klCanvas.getLayerMaskContext(currentLayerIndex)!;
+            if (currentBrushId === 'eraserBrush') {
+                maskBrush = maskEraserBrush;
+                maskBrush.setContext(context);
+                maskBrush.setSize(currentBrushUi.getSize());
+                maskBrush.setOpacity(currentBrushUi.getOpacity());
+                maskBrush.setColor({ r: 0, g: 0, b: 0 });
+            } else {
+                // Reuse the UI-owned brush so tip, scatter and pressure settings stay in sync.
+                maskBrush = currentBrushUi.getBrush() as PenBrush | BlendBrush;
+                if (maskBrush instanceof BlendBrush) {
+                    maskBrush.setContext(context, this.klCanvas.getLayer(currentLayerIndex).id, 'mask');
+                } else {
+                    maskBrush.setContext(context);
+                }
+                maskBrush.setColor(maskColor(currentColor));
+            }
+        };
         const finishMaskStroke = () => {
             if (!maskStrokeActive) {
                 return;
@@ -428,6 +455,7 @@ export class KlApp {
             try {
                 maskBrush.endLine();
             } finally {
+                restoreImageBrush();
                 this.klHistory.pause(false);
                 this.toolspace.style.pointerEvents = '';
                 this.klCanvas.markLayerMaskChanged(layerIndex);
@@ -445,7 +473,9 @@ export class KlApp {
         // when cycling through brushes you need to know the next non-eraser brush
         const getNextBrushId = (): TBrushId => {
             if (currentLayerTarget === 'mask') {
-                return currentBrushId === 'eraserBrush' ? 'penBrush' : 'eraserBrush';
+                return currentBrushId === 'eraserBrush'
+                    ? (supportsMaskBrush(lastNonEraserBrushId) ? lastNonEraserBrushId : 'penBrush')
+                    : 'eraserBrush';
             }
             if (currentBrushId === 'eraserBrush') {
                 return lastNonEraserBrushId;
@@ -505,15 +535,7 @@ export class KlApp {
             }
             if (currentLayerTarget === 'mask' && this.klCanvas.getLayerMaskContext(currentLayerIndex)) {
                 if (event.type === 'down') {
-                    const context = this.klCanvas.getLayerMaskContext(currentLayerIndex)!;
-                    maskBrush.setContext(context);
-                    maskBrush.setSize(currentBrushUi.getSize());
-                    maskBrush.setOpacity(currentBrushUi.getOpacity());
-                    maskBrush.setColor(
-                        currentBrushId === 'eraserBrush'
-                            ? { r: 0, g: 0, b: 0 }
-                            : maskColor(currentColor),
-                    );
+                    prepareMaskBrush();
                     maskStrokeLayerIndex = currentLayerIndex;
                     this.klHistory.pause(true);
                     maskStrokeActive = true;
@@ -521,6 +543,7 @@ export class KlApp {
                         maskBrush.startLine(event.x, event.y, event.pressure ?? 1);
                     } catch (error) {
                         maskStrokeActive = false;
+                        restoreImageBrush();
                         this.klHistory.pause(false);
                         this.toolspace.style.pointerEvents = '';
                         throw error;
@@ -528,28 +551,29 @@ export class KlApp {
                     this.toolspace.style.pointerEvents = 'none';
                 } else if (event.type === 'move' && maskStrokeActive) {
                     try {
-                        maskBrush.goLine(event.x, event.y, event.pressure ?? 1);
+                        if (maskBrush instanceof BlendBrush) {
+                            maskBrush.goLine(event.x, event.y, event.pressure ?? 1, false);
+                        } else {
+                            maskBrush.goLine(event.x, event.y, event.pressure ?? 1);
+                        }
                     } catch (error) {
                         finishMaskStroke();
                         throw error;
                     }
                 } else if (event.type === 'line') {
-                    maskBrush.setContext(this.klCanvas.getLayerMaskContext(currentLayerIndex)!);
-                    maskBrush.setSize(currentBrushUi.getSize());
-                    maskBrush.setOpacity(currentBrushUi.getOpacity());
-                    maskBrush.setColor(
-                        currentBrushId === 'eraserBrush'
-                            ? { r: 0, g: 0, b: 0 }
-                            : maskColor(currentColor),
-                    );
+                    prepareMaskBrush();
                     this.klHistory.pause(true);
                     try {
                         maskBrush.drawLineSegment(event.x0 ?? event.x1, event.y0 ?? event.y1, event.x1, event.y1);
                     } finally {
+                        restoreImageBrush();
                         this.klHistory.pause(false);
                     }
                 } else {
                     return;
+                }
+                if (maskBrush instanceof BlendBrush) {
+                    maskBrush.transferToCanvas();
                 }
                 this.klCanvas.markLayerMaskChanged(currentLayerIndex);
                 if (event.type === 'line') {
@@ -1326,7 +1350,7 @@ export class KlApp {
             onBrush: (brushId) => {
                 this.toolspaceToolRow.setActive('brush', true);
                 brushTabRow.open(
-                    currentLayerTarget === 'mask' && brushId !== 'eraserBrush'
+                    currentLayerTarget === 'mask' && !supportsMaskBrush(brushId)
                         ? 'penBrush'
                         : brushId,
                 );
@@ -1603,6 +1627,7 @@ export class KlApp {
         };
 
         const setCurrentBrush = (brushId: TBrushId) => {
+            finishMaskStroke();
             if (currentBrushUi && brushId !== currentBrushId) {
                 currentBrushUi.freeResources?.();
             }
@@ -1639,11 +1664,11 @@ export class KlApp {
                 for (const id of Object.keys(KL.BRUSHES_UI) as TBrushId[]) {
                     brushTabRow.setIsVisible(
                         id,
-                        nextTarget === 'image' || id === 'penBrush' || id === 'eraserBrush',
+                        nextTarget === 'image' || supportsMaskBrush(id),
                     );
                 }
                 if (nextTarget === 'mask') {
-                    brushTabRow.open('penBrush');
+                    brushTabRow.open(supportsMaskBrush(currentBrushId) ? currentBrushId : 'penBrush');
                     this.toolspaceToolRow.setActive('brush');
                     this.easel.setTool('brush');
                     mainTabRow?.open('brush');

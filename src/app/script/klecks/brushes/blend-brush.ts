@@ -34,6 +34,7 @@ type TDrawBufferItem = {
 export class BlendBrush {
     private context: CanvasRenderingContext2D = {} as CanvasRenderingContext2D;
     private layerId: string = 'NOT_SET';
+    private target: 'image' | 'mask' = 'image';
     private color: TRgb = {} as TRgb;
     private size: number = 29; // radius - 0.5 - 99999
     private opacity: number = 0.6; // 0-1
@@ -180,6 +181,13 @@ export class BlendBrush {
 
         const touchedCells = this.getTouchedCells(bounds);
         const composedLayer = this.klHistory.getComposed().layerMap[this.layerId];
+        if (!composedLayer) {
+            throw new Error(`BlendBrush target layer is missing: ${this.layerId}`);
+        }
+        const sourceTiles = this.target === 'mask' ? composedLayer.mask?.tiles : composedLayer.tiles;
+        if (!sourceTiles) {
+            throw new Error(`BlendBrush ${this.target} target has no composed tiles`);
+        }
 
         let canvas: HTMLCanvasElement | undefined;
         touchedCells.forEach((item, i) => {
@@ -187,8 +195,7 @@ export class BlendBrush {
                 // not touched, or already copied
                 return;
             }
-            // Uncaught TypeError: Cannot read properties of undefined (reading 'tiles')
-            const composedTile = composedLayer.tiles[i];
+            const composedTile = sourceTiles[i];
             if (isLayerFill(composedTile)) {
                 const { width, height } = getTileSizeFromIndex(i, this.context.canvas);
                 if (!canvas) {
@@ -608,9 +615,10 @@ export class BlendBrush {
         this.color = BB.copyObj(c);
     }
 
-    setContext(c: CanvasRenderingContext2D, id: string): void {
+    setContext(c: CanvasRenderingContext2D, id: string, target: 'image' | 'mask' = 'image'): void {
         this.context = c;
         this.layerId = id;
+        this.target = target;
     }
 
     setSizePressure(b: boolean): void {
@@ -751,7 +759,7 @@ export class BlendBrush {
 
         this.drawChangedCells();
 
-        if (this.cells.some((item) => item)) {
+        if (this.target !== 'mask' && this.cells.some((item) => item)) {
             let cells = this.cells;
             if (this.selectionBounds) {
                 const tilesInSelection = getChangedTiles(
