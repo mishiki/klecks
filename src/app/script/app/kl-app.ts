@@ -414,7 +414,6 @@ export class KlApp {
         let lastNonEraserBrushId: TBrushId;
         let currentLayerIndex: number = this.klCanvas.getLayerCount() - 1;
         let currentLayerTarget: TLayerEditTarget = 'image';
-        let imageColorBeforeMask: TRgb | undefined;
         let maskControls: HTMLElement | undefined;
         const maskBrush = new PenBrush();
         maskBrush.setHistory(this.klHistory);
@@ -467,7 +466,6 @@ export class KlApp {
 
         const brushSettingService = new KL.BrushSettingService({
             onSetColor: (color) => {
-                color = currentLayerTarget === 'mask' ? maskColor(color) : color;
                 this.klColorSlider.setColor(color);
                 currentBrushUi.setColor(color);
                 this.mobileColorUi.setColor(color);
@@ -1566,7 +1564,6 @@ export class KlApp {
         this.toolspaceInner.append(this.toolspaceToolRow.getElement());
 
         const setBrushColor = (p_color: TRgb) => {
-            p_color = currentLayerTarget === 'mask' ? maskColor(p_color) : p_color;
             if (currentLayerTarget === 'mask') {
                 this.klColorSlider.setColor(p_color);
             }
@@ -1636,17 +1633,8 @@ export class KlApp {
             const nextTarget: TLayerEditTarget =
                 target === 'mask' && this.klCanvas.getLayer(index).mask ? 'mask' : 'image';
             if (nextTarget !== currentLayerTarget) {
-                if (nextTarget === 'mask') {
-                    imageColorBeforeMask = currentColor;
-                    currentLayerTarget = 'mask';
-                    brushSettingService.setColor({ r: 0, g: 0, b: 0 });
-                } else {
-                    currentLayerTarget = 'image';
-                    if (imageColorBeforeMask) {
-                        brushSettingService.setColor(imageColorBeforeMask);
-                        imageColorBeforeMask = undefined;
-                    }
-                }
+                // The selected RGB color is shared; only mask painting converts it to gray.
+                currentLayerTarget = nextTarget;
                 maskControls && (maskControls.style.display = nextTarget === 'mask' ? 'block' : 'none');
                 for (const id of Object.keys(KL.BRUSHES_UI) as TBrushId[]) {
                     brushTabRow.setIsVisible(
