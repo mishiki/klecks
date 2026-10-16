@@ -22,7 +22,7 @@ export class EaselEyedropper implements TEaselTool {
     private readonly previewColor: SVGElement;
 
     // ----------------------------------- public -----------------------------------
-    tempTriggers: TEaselToolTrigger[] = ['mouse-right', 'alt'];
+    tempTriggers: TEaselToolTrigger[] = ['alt'];
 
     constructor(p: TEaselEyedropperParams) {
         this.svgEl = BB.createSvg({

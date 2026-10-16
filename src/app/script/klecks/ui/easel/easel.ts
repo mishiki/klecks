@@ -364,7 +364,6 @@ export class Easel<GToolId extends string> {
         });
 
         let mouseMiddleIsDown = false;
-        let mouseRightIsDown = false;
 
         let angleIsExtraSticky = false;
         this.pointerPreprocessor = new EaselPointerPreprocessor({
@@ -439,10 +438,6 @@ export class Easel<GToolId extends string> {
                         mouseMiddleIsDown = true;
                         this.pushTempTool(this.tempTools['mouse-middle']);
                     }
-                    if (e.button === 'right') {
-                        mouseRightIsDown = true;
-                        this.pushTempTool(this.tempTools['mouse-right']);
-                    }
                 } else if (e.type === 'pointermove') {
                     // noop?
                 } else if (e.type === 'pointerup') {
@@ -450,12 +445,6 @@ export class Easel<GToolId extends string> {
                         mouseMiddleIsDown = false;
                         this.getActiveTool().onPointer(e);
                         this.popTempTool(this.tempTools['mouse-middle']);
-                        return;
-                    }
-                    if (mouseRightIsDown) {
-                        mouseRightIsDown = false;
-                        this.getActiveTool().onPointer(e);
-                        this.popTempTool(this.tempTools['mouse-right']);
                         return;
                     }
                 }
