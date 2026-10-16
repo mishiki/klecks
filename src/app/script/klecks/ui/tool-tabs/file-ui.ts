@@ -18,6 +18,7 @@ const exportImg = getIconUrl('export');
 const shareImg = getIconUrl('share');
 const uploadImg = getIconUrl('upload');
 const importImg = getIconUrl('import');
+const addLayerImg = getIconUrl('add-layer');
 const LS_SHOW_SAVE_DIALOG = 'kl-save-dialog';
 
 const createSpacer = (): HTMLElement => {
@@ -62,7 +63,8 @@ export class FileUi {
     private readonly applyUncommitted: () => void;
 
     private readonly rootEl: HTMLDivElement;
-    private importInput: undefined | HTMLInputElement;
+    private openInput: undefined | HTMLInputElement;
+    private placeInput: undefined | HTMLInputElement;
     private browserStorageUi: undefined | BrowserStorageUi;
     private klRecoveryManager: KlRecoveryManager | undefined;
     private recoveryCountBubble: HTMLElement | undefined;
@@ -97,7 +99,7 @@ export class FileUi {
                 },
             });
 
-            // --- new, import, save ---
+            // --- new, open, place, save ---
             const newButton = BB.el({
                 tagName: 'button',
                 className: 'kl-button grid-button',
@@ -110,10 +112,10 @@ export class FileUi {
                 },
                 onClick: () => p.onNewImage(),
             });
-            const importButton = BB.el({
+            const openButton = BB.el({
                 tagName: 'button',
                 className: 'kl-button grid-button',
-                content: createButtonContent(LANG('file-import'), importImg, true),
+                content: createButtonContent(LANG('file-open'), importImg, true),
                 css: {
                     position: 'relative',
                     cursor: 'pointer',
@@ -122,25 +124,56 @@ export class FileUi {
                 props: {
                     tabIndex: -1,
                 },
-                onClick: () => this.importInput!.click(),
+                onClick: () => this.openInput!.click(),
             });
-            this.importInput = BB.el({
+            const placeButton = BB.el({
+                tagName: 'button',
+                className: 'kl-button grid-button',
+                content: createButtonContent(LANG('file-place'), addLayerImg, true),
+                css: {
+                    position: 'relative',
+                    cursor: 'pointer',
+                    float: 'left',
+                },
+                props: {
+                    tabIndex: -1,
+                },
+                onClick: () => this.placeInput!.click(),
+            });
+            this.openInput = BB.el({
                 tagName: 'input',
                 css: {
                     display: 'none',
                 },
                 onChange: () => {
                     this.applyUncommitted();
-                    this.importInput!.files && p.onFileSelect(this.importInput!.files, 'default');
-                    this.importInput!.value = '';
+                    this.openInput!.files && p.onFileSelect(this.openInput!.files, 'image');
+                    this.openInput!.value = '';
                 },
                 props: {
                     tabIndex: -1,
                 },
             });
-            this.importInput.type = 'file';
-            this.importInput.multiple = true;
-            this.importInput.accept = 'image/*,.psd'; // .psd needed for chrome, although it's image/vnd.adobe.photoshop
+            this.openInput.type = 'file';
+            this.openInput.multiple = false;
+            this.openInput.accept = 'image/*,.psd'; // .psd needed for chrome, although it's image/vnd.adobe.photoshop
+            this.placeInput = BB.el({
+                tagName: 'input',
+                css: {
+                    display: 'none',
+                },
+                onChange: () => {
+                    this.applyUncommitted();
+                    this.placeInput!.files && p.onFileSelect(this.placeInput!.files, 'layer');
+                    this.placeInput!.value = '';
+                },
+                props: {
+                    tabIndex: -1,
+                },
+            });
+            this.placeInput.type = 'file';
+            this.placeInput.multiple = true;
+            this.placeInput.accept = 'image/*,.psd'; // .psd needed for chrome, although it's image/vnd.adobe.photoshop
             const saveButton = BB.el({
                 tagName: 'button',
                 className: 'kl-button',
@@ -310,7 +343,8 @@ export class FileUi {
             BB.append(this.rootEl, [
                 saveNote,
                 newButton,
-                importButton,
+                openButton,
+                placeButton,
                 BB.el({ css: { clear: 'both' } }),
                 saveRow,
                 createSpacer(),
@@ -348,7 +382,11 @@ export class FileUi {
         }
     }
 
-    triggerImport(): void {
-        this.importInput && this.importInput.click();
+    triggerOpen(): void {
+        this.openInput && this.openInput.click();
+    }
+
+    triggerPlace(): void {
+        this.placeInput && this.placeInput.click();
     }
 }

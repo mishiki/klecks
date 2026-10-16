@@ -375,6 +375,14 @@ Renaming a key across multiple language files:
     "hint": "action",
     "value": "Import"
   },
+  "file-open": {
+    "hint": "action to open an image as a new document",
+    "value": "Open"
+  },
+  "file-place": {
+    "hint": "action to place an image as a new layer in the current document",
+    "value": "Place Image"
+  },
   "file-save": {
     "hint": "action",
     "value": "Save"

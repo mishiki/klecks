@@ -1,3 +1,4 @@
+import { showPsdWarnings } from '../klecks/ui/modals/show-import-image-dialog';
 import { TDropOption, TKlPsd, TRgb } from '../klecks/kl-types';
 import { KL } from '../klecks/kl';
 import { LANG } from '../language/language';
@@ -106,6 +107,7 @@ export class KlAppImportHandler {
                 height: resizedDimensions.height,
             });
             this.klCanvas.reset({
+                clearHistory: true,
                 width: resizedDimensions.width,
                 height: resizedDimensions.height,
                 image: tempCanvas,
@@ -217,6 +219,7 @@ export class KlAppImportHandler {
                     }
                 }
                 layerIndex = this.klCanvas.reset({
+                    clearHistory: true,
                     width: convertedPsdObj.width,
                     height: convertedPsdObj.height,
                     background: convertedPsdObj.background ?? 'transparent',
@@ -241,6 +244,7 @@ export class KlAppImportHandler {
                 });
             } else {
                 layerIndex = this.klCanvas.reset({
+                    clearHistory: true,
                     width: convertedPsdObj.width,
                     height: convertedPsdObj.height,
                     image: convertedPsdObj.canvas,
@@ -344,6 +348,9 @@ export class KlAppImportHandler {
         if (optionStr === 'image') {
             if (importedImage.type === 'psd') {
                 importAsImagePsd(importedImage);
+                if (importedImage.warningArr?.length) {
+                    showPsdWarnings(importedImage.warningArr);
+                }
             } else {
                 importAsImage(importedImage.canvas);
             }

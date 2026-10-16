@@ -20,7 +20,7 @@ export class ToolspaceTopRow {
         logoImg?: string;
         onLogo: () => void;
         onNew: () => void;
-        onImport: () => void;
+        onOpen: () => void;
         onSave: () => void;
         onShare: () => void;
         onHelp: () => void;
@@ -103,9 +103,9 @@ export class ToolspaceTopRow {
             extraPadding: 1,
             contain: true,
         });
-        const importButton = createButton({
-            onClick: p.onImport,
-            title: LANG('file-import'),
+        const openButton = createButton({
+            onClick: p.onOpen,
+            title: LANG('file-open'),
             image: importImg,
             extraPadding: 1,
             contain: true,
@@ -143,7 +143,7 @@ export class ToolspaceTopRow {
         BB.append(this.rootEl, [
             logoButton.el,
             newButton.el,
-            importButton.el,
+            openButton.el,
             saveButton.el,
             shareButton ? shareButton.el : undefined,
             helpButton.el,

@@ -1481,8 +1481,8 @@ export class KlApp {
                 onNew: () => {
                     showNewImageDialog();
                 },
-                onImport: () => {
-                    fileUi!.triggerImport();
+                onOpen: () => {
+                    fileUi!.triggerOpen();
                 },
                 onSave: () => {
                     this.saveToComputer.save();
@@ -1978,6 +1978,7 @@ export class KlApp {
                         width: width,
                         height: height,
                         background,
+                        clearHistory: true,
                     });
 
                     this.layersUi.update(0);
@@ -2120,6 +2121,7 @@ export class KlApp {
                 width: project.project.width,
                 height: project.project.height,
                 background: project.project.background ?? 'transparent',
+                clearHistory: true,
                 layers: project.project.layers.map((item) => {
                     let image = item.image;
                     if (!(image instanceof HTMLCanvasElement)) {

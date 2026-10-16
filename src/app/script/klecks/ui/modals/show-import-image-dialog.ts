@@ -86,20 +86,6 @@ export function showImportImageDialog(p: {
     updateResolution(p.image.width, p.image.height);
 
     let doFlatten = false;
-    function showWarnings(psdWarningArr: TKlPsdError[]): void {
-        const warningMap = {
-            mask: LANG('import-mask-effects-unsupported'),
-            group: 'Groups not supported. Layers were ungrouped.',
-            adjustment: LANG('import-adjustment-placeholder'),
-            'layer-effect': 'Layer effects not supported.',
-            'smart-object': 'Smart objects not supported.',
-            'blend-mode': 'Unsupported layer blend mode.',
-            'bits-per-channel': 'Unsupported color depth. Only 8bit per channel supported.',
-        };
-        const contentArr = psdWarningArr.map((warning) => '- ' + warningMap[warning]);
-        alert(contentArr.join('\n'));
-    }
-
     let flattenCheckbox: Checkbox;
     let warningsEl: HTMLElement | undefined;
     if (p.image.type === 'psd') {
@@ -126,7 +112,7 @@ export function showImportImageDialog(p: {
                     destroyer,
                     content: 'Details',
                     css: { marginLeft: 5 },
-                    onClick: () => showWarnings(warnings),
+                    onClick: () => showPsdWarnings(warnings),
                 });
                 rootEl.append(noteEl);
             }
@@ -194,4 +180,18 @@ export function showImportImageDialog(p: {
         },
         autoFocus: 'as-image',
     });
+}
+
+export function showPsdWarnings(psdWarningArr: TKlPsdError[]): void {
+    const warningMap = {
+        mask: LANG('import-mask-effects-unsupported'),
+        group: 'Groups not supported. Layers were ungrouped.',
+        adjustment: LANG('import-adjustment-placeholder'),
+        'layer-effect': 'Layer effects not supported.',
+        'smart-object': 'Smart objects not supported.',
+        'blend-mode': 'Unsupported layer blend mode.',
+        'bits-per-channel': 'Unsupported color depth. Only 8bit per channel supported.',
+    };
+    const contentArr = psdWarningArr.map((warning) => '- ' + warningMap[warning]);
+    alert(contentArr.join('\n'));
 }

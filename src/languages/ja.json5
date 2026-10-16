@@ -543,6 +543,16 @@
     original: 'Import',
     value: '配置'
   },
+  'file-open': {
+    hint: 'action to open an image as a new document',
+    original: 'Open',
+    value: '開く'
+  },
+  'file-place': {
+    hint: 'action to place an image as a new layer in the current document',
+    original: 'Place Image',
+    value: '配置'
+  },
   'file-save': {
     hint: 'action',
     original: 'Save',

@@ -7,6 +7,8 @@ This fork starts with these changes:
 - Background state follows undo/redo, browser storage, recovery, and image exports.
 - PSD exports represent white paper as a marked bottom layer for other readers. This fork restores unchanged marked paper as document background when reopening the PSD. Edited or unmarked paper remains an ordinary layer.
 
+The file tab separates Open from Place Image. The top folder button opens a single document directly; Place Image keeps the existing transform/placement dialog and adds a layer (PSD placement uses its merged image). New documents and opened documents, including browser-stored documents, start a fresh undo/redo baseline. Placement remains undoable within the current document. The required baseline is retained even when it alone exceeds the history memory budget.
+
 Drawing, pen input, and UI behavior are evaluated manually. The layer limit is a cap, not a guarantee that every canvas size fits in device memory.
 
 New Image accepts dimensions up to 8192 × 8192. Its initial width is the rounded screen.width × devicePixelRatio estimate (capped at 8192); the initial image is square. Ratio presets run from landscape through square to portrait and preserve the last-focused dimension while calculating the other (width by default). If only one dimension is valid, that dimension is used as the reference. Dimensions can also be entered independently.

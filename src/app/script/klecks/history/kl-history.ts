@@ -90,6 +90,17 @@ export class KlHistory {
         this.listeners.push(l);
     }
 
+    /** Start a different document with one non-undoable baseline. */
+    reset(oldest: THistoryEntryDataComposed): void {
+        validateHistoryEntry(oldest, oldest.size);
+        this.entries = [{ timestamp: Date.now(), memoryEstimateBytes: estimateBytes(oldest), data: oldest }];
+        this.index = 0;
+        this.composed = oldest;
+        // Save/recovery observers require a monotonically increasing revision.
+        this.totalActions++;
+        this.broadcast();
+    }
+
     // doesn't push if: paused or if entry is empty
     push(entryData: THistoryEntryData, replaceTop?: boolean): void {
         if (this.pauseStack > 0) {

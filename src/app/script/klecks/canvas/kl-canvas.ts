@@ -198,6 +198,7 @@ export class KlCanvas {
      * @param p
      */
     reset(p: {
+        clearHistory?: boolean; // a different document starts a new baseline
         projectId?: string; // uuid
         width: number;
         height: number;
@@ -306,7 +307,11 @@ export class KlCanvas {
                     attributes: 'all',
                 }) as Record<TLayerId, THistoryEntryLayerComposed>,
             };
-            this.klHistory.push(historyEntryData);
+            if (p.clearHistory) {
+                this.klHistory.reset(historyEntryData);
+            } else {
+                this.klHistory.push(historyEntryData);
+            }
         }
 
         return this.getTopPaintIndex();

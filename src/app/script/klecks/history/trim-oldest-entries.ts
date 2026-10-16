@@ -100,7 +100,8 @@ export function trimOldestEntries(entries: THistoryEntry[]): THistoryEntry[] {
         oldestIndex = 0;
 
         // Despite the earlier check the composed entry may still push the total over 1 GB.
-        if (getTotalMemoryBytes(entries) > TOTAL_THRESHOLD_BYTES) {
+        // Keep the required baseline even if it alone exceeds the budget.
+        if (entries.length > 1 && getTotalMemoryBytes(entries) > TOTAL_THRESHOLD_BYTES) {
             oldestIndex = 1;
         }
     }
